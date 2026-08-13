@@ -3,7 +3,7 @@
 **A simple Android app that helps your parrot practice human speech through repetition and response.**
 
 <p align="center">
-  <img src="docs/parrot-trainer.webp" alt="Parrot Trainer app" width="340">
+  <img src="docs/parrot-trainer.jpg" alt="Parrot Trainer app" width="340">
 </p>
 
 Parrot Trainer listens to the room and reacts when your bird makes a sound. After a short pause, it plays one of your training phrases using text-to-speech. If the room stays quiet for too long, the app can repeat a phrase automatically.
