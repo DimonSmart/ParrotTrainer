@@ -1,23 +1,28 @@
-# Попугайчик учится говорить
+# 🦜 Parrot Trainer
 
-Flutter-приложение для Android, которое слушает звуки попугая и отвечает случайной тренировочной фразой после заданной паузы. При полной тишине фраза произносится по максимальному интервалу.
+**A simple Android app that helps your parrot practice human speech through repetition and response.**
 
-## Возможности
+<p align="center">
+  <img src="docs/parrot-trainer.webp" alt="Parrot Trainer app" width="340">
+</p>
 
-- измерение уровня микрофона в dBFS и настраиваемый порог;
-- сглаживание, hysteresis и события начала/окончания звука;
-- явная state machine с защитой от собственного TTS;
-- выбор нескольких установленных Android TTS-голосов;
-- редактор фраз, настройки темпа/высоты/громкости;
-- сохраняемые настройки и lifetime-статистика;
-- безопасная остановка при уходе приложения в background.
+Parrot Trainer listens to the room and reacts when your bird makes a sound. After a short pause, it plays one of your training phrases using text-to-speech. If the room stays quiet for too long, the app can repeat a phrase automatically.
 
-## Проверка и сборка
+The idea is simple: **your parrot makes a sound → hears a familiar phrase → gets a chance to respond.**
 
-```shell
-flutter test
-flutter analyze
-flutter build apk --release
-```
+## What you can control
 
-Готовый APK создаётся в `build/app/outputs/flutter-apk/app-release.apk`.
+- your own training phrases;
+- microphone sensitivity and trigger threshold;
+- minimum and maximum intervals between phrases;
+- response pause after the bird makes a sound;
+- one or several TTS voices, including random voice selection;
+- speech rate, pitch, and volume.
+
+The main screen also shows the current sound level, listening status, and simple statistics such as phrases spoken and bird responses.
+
+Everything is available from one screen: place the phone near the cage, tune the sensitivity, switch training on, and let the app handle the repetitions.
+
+> Parrot Trainer is a training aid, not a guarantee that a bird will learn to speak. Every parrot learns differently.
+
+Developer notes, build instructions, and implementation details are in [DEVELOPMENT.md](DEVELOPMENT.md).
