@@ -12,10 +12,23 @@ class TrainingPhrase {
   final String text;
   final String? recordedAudioPath;
 
-  TrainingPhrase copyWith({String? text, String? recordedAudioPath, bool clearRecording = false}) =>
-      TrainingPhrase(id: id, text: text ?? this.text, recordedAudioPath: clearRecording ? null : recordedAudioPath ?? this.recordedAudioPath);
+  TrainingPhrase copyWith({
+    String? text,
+    String? recordedAudioPath,
+    bool clearRecording = false,
+  }) => TrainingPhrase(
+    id: id,
+    text: text ?? this.text,
+    recordedAudioPath: clearRecording
+        ? null
+        : recordedAudioPath ?? this.recordedAudioPath,
+  );
 
-  Map<String, Object?> toJson() => {'id': id, 'text': text, 'recordedAudioPath': recordedAudioPath};
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'text': text,
+    'recordedAudioPath': recordedAudioPath,
+  };
 
   factory TrainingPhrase.fromJson(Map<String, dynamic> json) => TrainingPhrase(
     id: json['id'] as String? ?? newId(),
@@ -23,10 +36,15 @@ class TrainingPhrase {
     recordedAudioPath: json['recordedAudioPath'] as String?,
   );
 
-  static String newId() => '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+  static String newId() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
 
   @override
-  bool operator ==(Object other) => other is TrainingPhrase && other.id == id && other.text == text && other.recordedAudioPath == recordedAudioPath;
+  bool operator ==(Object other) =>
+      other is TrainingPhrase &&
+      other.id == id &&
+      other.text == text &&
+      other.recordedAudioPath == recordedAudioPath;
   @override
   int get hashCode => Object.hash(id, text, recordedAudioPath);
 }

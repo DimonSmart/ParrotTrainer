@@ -67,7 +67,11 @@ class AppController extends ChangeNotifier {
     _levelSubscription = _audio.levels.listen((level) {
       currentLevelDb = level;
       final started = _calibrationStartedAt;
-      if (calibrating && started != null && DateTime.now().difference(started) >= const Duration(seconds: 2)) _calibrationSamples.add(level);
+      if (calibrating &&
+          started != null &&
+          DateTime.now().difference(started) >= const Duration(seconds: 2)) {
+        _calibrationSamples.add(level);
+      }
       session.handleAudioLevel(level);
       notifyListeners();
     });
@@ -161,7 +165,11 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       await Future<void>.delayed(const Duration(seconds: 1));
     }
-    final threshold = MicrophoneCalibration.threshold(samples: _calibrationSamples, minimum: -80, maximum: 0);
+    final threshold = MicrophoneCalibration.threshold(
+      samples: _calibrationSamples,
+      minimum: -80,
+      maximum: 0,
+    );
     calibrating = false;
     calibrationSecondsLeft = 0;
     await updateSettings(settings.copyWith(soundThresholdDb: threshold));

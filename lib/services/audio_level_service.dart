@@ -46,10 +46,7 @@ class AudioLevelService {
 
   Future<T> _enqueue<T>(Future<T> Function() operation) {
     final result = _pendingOperation.then((_) => operation());
-    _pendingOperation = result.then<void>(
-      (_) {},
-      onError: (_, _) {},
-    );
+    _pendingOperation = result.then<void>((_) {}, onError: (_, _) {});
     return result;
   }
 

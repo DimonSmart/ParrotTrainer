@@ -197,15 +197,44 @@ class _PhrasesCard extends StatelessWidget {
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: controller.settings.phrases
-          .take(4)
-          .map(
-            (phrase) => Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Text(phrase.text, style: const TextStyle(fontSize: 18)),
+      children: [
+        ...controller.settings.phrases
+            .take(4)
+            .map(
+              (phrase) => Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Text(phrase.text, style: const TextStyle(fontSize: 18)),
+              ),
             ),
-          )
-          .toList(),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const Text('Изучаем сейчас: '),
+            Expanded(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: controller.settings.focusPhraseId,
+                hint: const Text('Все фразы'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Все фразы')),
+                  ...controller.settings.phrases.map(
+                    (phrase) => DropdownMenuItem(
+                      value: phrase.id,
+                      child: Text(phrase.text, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                ],
+                onChanged: (id) => controller.updateSettings(
+                  controller.settings.copyWith(
+                    focusPhraseId: id,
+                    clearFocusPhrase: id == null,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     ),
   );
 }
@@ -286,9 +315,15 @@ class _MicrophoneCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           OutlinedButton.icon(
-            onPressed: controller.calibrating ? null : controller.calibrateMicrophone,
+            onPressed: controller.calibrating
+                ? null
+                : controller.calibrateMicrophone,
             icon: const Icon(Icons.tune),
-            label: Text(controller.calibrating ? 'Калибровка… ${controller.calibrationSecondsLeft} сек' : 'Калибровать микрофон'),
+            label: Text(
+              controller.calibrating
+                  ? 'Калибровка… ${controller.calibrationSecondsLeft} сек'
+                  : 'Калибровать микрофон',
+            ),
           ),
         ],
       ),
@@ -376,28 +411,66 @@ class _IntervalsCard extends StatelessWidget {
               controller.updateSettings(
                 settings.copyWith(
                   minimumInterval: min,
-                  idlePromptMinInterval: settings.idlePromptMinInterval < min ? min : null,
-                  idlePromptMaxInterval: settings.idlePromptMaxInterval < min ? min : null,
+                  idlePromptMinInterval: settings.idlePromptMinInterval < min
+                      ? min
+                      : null,
+                  idlePromptMaxInterval: settings.idlePromptMaxInterval < min
+                      ? min
+                      : null,
                 ),
               );
             },
           ),
-          _DurationSlider(
-            label: 'Инициировать разговор до',
-            value: settings.idlePromptMaxInterval.inSeconds.toDouble().clamp(5, 180),
-            min: 5,
-            max: 180,
-            suffix: 'сек',
-            divisions: 175,
-            onChanged: (value) {
-              final max = Duration(seconds: value.round());
-              controller.updateSettings(
-                settings.copyWith(
-                  idlePromptMaxInterval: max,
-                  minimumInterval: settings.minimumInterval > max ? max : null,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Инициировать разговор',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    Text(
+                      '${settings.idlePromptMinInterval.inSeconds}–${settings.idlePromptMaxInterval.inSeconds} сек',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            },
+                RangeSlider(
+                  values: RangeValues(
+                    settings.idlePromptMinInterval.inSeconds.toDouble().clamp(
+                      settings.minimumInterval.inSeconds.toDouble(),
+                      180,
+                    ),
+                    settings.idlePromptMaxInterval.inSeconds.toDouble().clamp(
+                      settings.minimumInterval.inSeconds.toDouble(),
+                      180,
+                    ),
+                  ),
+                  min: settings.minimumInterval.inSeconds.toDouble(),
+                  max: 180,
+                  divisions: (180 - settings.minimumInterval.inSeconds).clamp(
+                    1,
+                    179,
+                  ),
+                  onChanged: (range) => controller.updateSettings(
+                    settings.copyWith(
+                      idlePromptMinInterval: Duration(
+                        seconds: range.start.round(),
+                      ),
+                      idlePromptMaxInterval: Duration(
+                        seconds: range.end.round(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           _DurationSlider(
             label: 'Пауза для ответа',
@@ -475,46 +548,56 @@ class _VoicesCard extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => VoicesScreen(controller: controller)),
       ),
-      child: Column(children: [
-        Row(children: [
-          Expanded(
-            child: Text(
-              selected == 0
-                  ? 'Голос Android по умолчанию'
-                  : 'Выбрано голосов: $selected',
-              style: const TextStyle(fontSize: 17),
-            ),
-          ),
-          ...List.generate(
-            math.min(3, math.max(1, selected)),
-            (index) => Container(
-              margin: const EdgeInsets.only(left: 8),
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: [
-                  Colors.lightGreen.shade100,
-                  Colors.amber.shade100,
-                  Colors.lightBlue.shade100,
-                ][index],
-                shape: BoxShape.circle,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selected == 0
+                      ? 'Голос Android по умолчанию'
+                      : 'Выбрано голосов: $selected',
+                  style: const TextStyle(fontSize: 17),
+                ),
               ),
-              child: Icon(
-                Icons.person,
-                color: [
-                  Colors.green.shade700,
-                  Colors.orange.shade700,
-                  Colors.blue.shade700,
-                ][index],
+              ...List.generate(
+                math.min(3, math.max(1, selected)),
+                (index) => Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: [
+                      Colors.lightGreen.shade100,
+                      Colors.amber.shade100,
+                      Colors.lightBlue.shade100,
+                    ][index],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.person,
+                    color: [
+                      Colors.green.shade700,
+                      Colors.orange.shade700,
+                      Colors.blue.shade700,
+                    ][index],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right),
-        ]),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(onPressed: controller.session.lastPhrase == null ? null : controller.markGoodAttempt, icon: const Icon(Icons.star_outline), label: const Text('Хорошая попытка')),
-      ]),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: controller.session.lastPhrase == null
+                ? null
+                : controller.markGoodAttempt,
+            icon: const Icon(Icons.star_outline),
+            label: const Text('Хорошая попытка'),
+          ),
+        ],
+      ),
     );
   }
 }

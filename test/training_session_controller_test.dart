@@ -96,8 +96,13 @@ void main() {
         fixture.controller.handleSoundChanged(true);
         fixture.controller.handleSoundChanged(false);
         expect(fixture.controller.statistics.soundEvents, 0);
+        await flushAsync();
+        await flushAsync();
         tts.completeSpeech();
         await flushAsync();
+        await flushAsync();
+        fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+        fixture.controller.tick();
         expect(fixture.controller.statistics.timeoutPhrases, 1);
         expect(fixture.controller.statistics.responsesToSound, 0);
       },
@@ -134,14 +139,21 @@ void main() {
       fixture.clock.advance(const Duration(seconds: 30));
       fixture.controller.tick();
       fixture.clock.advance(const Duration(seconds: 4));
+      await flushAsync();
+      await flushAsync();
       tts.completeSpeech();
       await flushAsync();
+      await flushAsync();
+      expect(fixture.controller.state, TrainingState.postSpeechGuard);
+      fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+      fixture.controller.tick();
       expect(fixture.controller.cycleStartedAt, fixture.clock.now());
       fixture.clock.advance(const Duration(seconds: 29));
       fixture.controller.tick();
       expect(tts.calls, 1);
       fixture.clock.advance(const Duration(seconds: 1));
       fixture.controller.tick();
+      await flushAsync();
       expect(tts.calls, 2);
     });
 
@@ -155,6 +167,8 @@ void main() {
       fixture.clock.advance(const Duration(seconds: 2));
       fixture.controller.tick();
       await flushAsync();
+      fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+      fixture.controller.tick();
       fixture.clock.advance(const Duration(seconds: 30));
       fixture.controller.tick();
       await flushAsync();
@@ -164,6 +178,47 @@ void main() {
       expect(stats.timeoutPhrases, 1);
       expect(stats.responsePercent, 50);
     });
+
+    test(
+      'sound during post TTS guard is ignored and sound after it is accepted',
+      () async {
+        final fixture = Fixture();
+        fixture.controller.start();
+        fixture.clock.advance(const Duration(seconds: 30));
+        fixture.controller.tick();
+        await flushAsync();
+        await flushAsync();
+        expect(fixture.controller.state, TrainingState.postSpeechGuard);
+        fixture.controller.handleSoundChanged(true);
+        expect(fixture.controller.statistics.soundEvents, 0);
+        fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+        fixture.controller.tick();
+        fixture.controller.handleSoundChanged(true);
+        expect(fixture.controller.statistics.soundEvents, 1);
+        expect(fixture.controller.statistics.birdRepliesAfterApp, 1);
+      },
+    );
+
+    test(
+      'idle prompts stop after unanswered limit and bird breaks quiet period',
+      () async {
+        final fixture = Fixture();
+        fixture.controller.start();
+        for (var i = 0; i < 2; i++) {
+          fixture.clock.advance(const Duration(seconds: 30));
+          fixture.controller.tick();
+          await flushAsync();
+          await flushAsync();
+          fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+          fixture.controller.tick();
+          fixture.clock.advance(TrainingSessionController.birdReplyWindow);
+          fixture.controller.tick();
+        }
+        expect(fixture.controller.state, TrainingState.quietPeriod);
+        fixture.controller.handleSoundChanged(true);
+        expect(fixture.controller.state, TrainingState.soundDetected);
+      },
+    );
   });
 
   test('dBFS normalization converts in both directions', () {
