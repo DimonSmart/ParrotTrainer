@@ -5,8 +5,7 @@ class TrainingPhrase {
     required this.id,
     required this.text,
     this.recordedAudioPath,
-  }) : assert(id != ''),
-       assert(text != '');
+  }) : assert(id != '');
 
   final String id;
   final String text;

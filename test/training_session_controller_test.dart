@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:parrot_trainer/controllers/training_session_controller.dart';
+import 'package:parrot_trainer/models/training_phrase.dart';
 import 'package:parrot_trainer/models/training_settings.dart';
 import 'package:parrot_trainer/models/training_statistics.dart';
+import 'package:parrot_trainer/services/recorded_phrase_player.dart';
 import 'package:parrot_trainer/services/sound_detector.dart';
 import 'package:parrot_trainer/services/sources.dart';
 import 'package:parrot_trainer/services/tts_service.dart';
@@ -51,6 +53,43 @@ void main() {
       await flushAsync();
       expect(fixture.tts.calls, 1);
       expect(fixture.controller.statistics.timeoutPhrases, 1);
+    });
+
+    test('recorded audio has priority and TTS remains the fallback', () async {
+      final recordedPlayer = FakeRecordedPlayer(available: true);
+      final recorded = Fixture(
+        recordedPlayer: recordedPlayer,
+        phrases: const [
+          TrainingPhrase(
+            id: 'recorded',
+            text: 'Записанная',
+            recordedAudioPath: '/phrase.m4a',
+          ),
+        ],
+      );
+      recorded.controller.start();
+      recorded.clock.advance(const Duration(seconds: 30));
+      recorded.controller.tick();
+      await flushAsync();
+      expect(recordedPlayer.paths, ['/phrase.m4a']);
+      expect(recorded.tts.calls, 0);
+
+      final missingPlayer = FakeRecordedPlayer(available: false);
+      final fallback = Fixture(
+        recordedPlayer: missingPlayer,
+        phrases: const [
+          TrainingPhrase(
+            id: 'missing',
+            text: 'Через TTS',
+            recordedAudioPath: '/missing.m4a',
+          ),
+        ],
+      );
+      fallback.controller.start();
+      fallback.clock.advance(const Duration(seconds: 30));
+      fallback.controller.tick();
+      await flushAsync();
+      expect(fallback.tts.calls, 1);
     });
 
     test('countdown switches to the short silence delay after a chirp', () {
@@ -231,9 +270,14 @@ void main() {
 Future<void> flushAsync() => Future<void>.delayed(Duration.zero);
 
 class Fixture {
-  Fixture({FakeTts? tts}) : tts = tts ?? FakeTts() {
+  Fixture({
+    FakeTts? tts,
+    RecordedPhrasePlayer? recordedPlayer,
+    List<TrainingPhrase>? phrases,
+  }) : tts = tts ?? FakeTts() {
     controller = TrainingSessionController(
       initialSettings: TrainingSettings.defaults.copyWith(
+        phrases: phrases,
         idlePromptMinInterval: const Duration(seconds: 30),
         idlePromptMaxInterval: const Duration(seconds: 30),
       ),
@@ -242,12 +286,30 @@ class Fixture {
       ttsService: this.tts,
       sessionClock: clock,
       randomSource: FixedRandom(),
+      recordedPhrasePlayer: recordedPlayer,
       enableAutomaticTicks: false,
     );
   }
   final FakeClock clock = FakeClock();
   final FakeTts tts;
   late final TrainingSessionController controller;
+}
+
+class FakeRecordedPlayer implements RecordedPhrasePlayer {
+  FakeRecordedPlayer({required this.available});
+  final bool available;
+  final List<String?> paths = [];
+
+  @override
+  Future<bool> playIfAvailable(String? path) async {
+    paths.add(path);
+    return available;
+  }
+
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> dispose() async {}
 }
 
 class FakeClock implements Clock {

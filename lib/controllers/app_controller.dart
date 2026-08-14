@@ -43,6 +43,7 @@ class AppController extends ChangeNotifier {
   int calibrationSecondsLeft = 0;
   final List<double> _calibrationSamples = [];
   DateTime? _calibrationStartedAt;
+  bool _microphoneCaptureSuspended = false;
 
   Future<void> initialize() async {
     settings = await _settingsRepository.load();
@@ -133,6 +134,22 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> resumeForeground() async {
+    if (_microphoneCaptureSuspended) return;
+    await _startAudioCapture();
+  }
+
+  Future<void> suspendMicrophoneCapture() async {
+    _microphoneCaptureSuspended = true;
+    await stopTraining();
+    await _audio.stop();
+  }
+
+  Future<void> resumeMicrophoneCapture() async {
+    _microphoneCaptureSuspended = false;
+    await _startAudioCapture();
+  }
+
+  Future<void> _startAudioCapture() async {
     try {
       microphoneAvailable = await _audio.start();
     } catch (_) {

@@ -533,6 +533,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  stt_record:
+    dependency: "direct main"
+    description:
+      name: stt_record
+      sha256: b28b7900bd99a7c1866b02efd416905e26be9944aa8ac3a19ba4c38485a01a20
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.8"
   synchronized:
     dependency: transitive
     description:

@@ -172,17 +172,26 @@ class _PhrasesCard extends StatelessWidget {
   const _PhrasesCard({required this.controller});
   final AppController controller;
   Future<void> _open(BuildContext context) async {
-    final phrases = await Navigator.push<List<TrainingPhrase>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            PhraseEditorScreen(phrases: controller.settings.phrases),
-      ),
-    );
-    if (phrases != null) {
-      await controller.updateSettings(
-        controller.settings.copyWith(phrases: phrases),
+    await controller.suspendMicrophoneCapture();
+    if (!context.mounted) {
+      await controller.resumeMicrophoneCapture();
+      return;
+    }
+    try {
+      final phrases = await Navigator.push<List<TrainingPhrase>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              PhraseEditorScreen(phrases: controller.settings.phrases),
+        ),
       );
+      if (phrases != null) {
+        await controller.updateSettings(
+          controller.settings.copyWith(phrases: phrases),
+        );
+      }
+    } finally {
+      await controller.resumeMicrophoneCapture();
     }
   }
 
