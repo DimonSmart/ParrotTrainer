@@ -3,50 +3,45 @@ import 'package:flutter/material.dart';
 import '../controllers/app_controller.dart';
 import '../services/tts_service.dart';
 
-class VoicesScreen extends StatelessWidget {
+class VoicesScreen extends StatefulWidget {
   const VoicesScreen({super.key, required this.controller});
   final AppController controller;
 
   @override
+  State<VoicesScreen> createState() => _VoicesScreenState();
+}
+
+class _VoicesScreenState extends State<VoicesScreen> {
+  String _voiceFilter = '';
+
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
+    animation: widget.controller,
     builder: (context, _) {
+      final controller = widget.controller;
       final settings = controller.settings;
+      final filter = _voiceFilter.trim().toLowerCase();
+      final voices = controller.voices.where((voice) {
+        if (filter.isEmpty) return true;
+        return voice.name.toLowerCase().contains(filter) ||
+            voice.locale.toLowerCase().contains(filter);
+      }).toList();
       return Scaffold(
         appBar: AppBar(title: const Text('Голоса и речь')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Установленные голоса',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Можно выбрать несколько. Если ничего не выбрано, используется голос Android по умолчанию.',
-            ),
-            const SizedBox(height: 12),
-            if (controller.voices.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text(
-                    'Android не сообщил об установленных TTS-голосах. Проверьте настройки синтеза речи.',
-                  ),
-                ),
-              )
-            else
-              ...controller.voices.map(
-                (voice) => _VoiceTile(controller: controller, voice: voice),
-              ),
-            const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Text(
+                      'Настройки речи',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
                     _SettingSlider(
                       label: 'Скорость речи',
                       value: settings.speechRate,
@@ -74,10 +69,60 @@ class VoicesScreen extends StatelessWidget {
                         settings.copyWith(speechVolume: v),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      key: const Key('previewSpeechSettings'),
+                      onPressed: controller.previewSpeechSettings,
+                      icon: const Icon(Icons.volume_up_outlined),
+                      label: const Text('Проверить звучание'),
+                    ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            Text(
+              'Установленные голоса',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Можно выбрать несколько. Если ничего не выбрано, используется голос Android по умолчанию.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('voiceFilter'),
+              onChanged: (value) => setState(() => _voiceFilter = value),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Фильтр голосов',
+                hintText: 'Например, ru или Russian',
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (controller.voices.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'Android не сообщил об установленных TTS-голосах. Проверьте настройки синтеза речи.',
+                  ),
+                ),
+              )
+            else if (voices.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('По этому фильтру голоса не найдены.'),
+                ),
+              )
+            else
+              ...voices.map(
+                (voice) => _VoiceTile(controller: controller, voice: voice),
+              ),
           ],
         ),
       );

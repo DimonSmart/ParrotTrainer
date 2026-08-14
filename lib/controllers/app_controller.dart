@@ -255,6 +255,11 @@ class AppController extends ChangeNotifier {
     await tts.speak('Привет, моя птичка', settings, voice);
   }
 
+  Future<void> previewSpeechSettings() async {
+    await session.stop();
+    await tts.speak('Привет, моя птичка', settings, null);
+  }
+
   @override
   void dispose() {
     session.removeListener(_sessionChanged);

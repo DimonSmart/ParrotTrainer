@@ -133,6 +133,7 @@ void main() {
     await tester.tap(find.byKey(const Key('addVoicePhrase')));
     await tester.pump();
     expect(fixture.recorder.startedIds, hasLength(1));
+    expect(fixture.events, ['speech.start', 'speech.cancel', 'recorder.start']);
     await tester.tap(find.text('Остановить'));
     await tester.pump();
     await tester.enterText(find.byType(TextField).last, 'Вручную');
@@ -141,6 +142,40 @@ void main() {
     expect(lastText(tester), 'Вручную');
     expect(find.text('Не удалось начать запись'), findsNothing);
   });
+
+  testWidgets('empty coordinated audio switches later recordings to fallback', (
+    tester,
+  ) async {
+    final fixture = await _pumpEditor(tester, const [original]);
+    fixture.speech.stopError = const EmptyAudioRecordingException();
+
+    await recordNewVoicePhrase(tester);
+    expect(find.text('Не удалось записать звук'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('addVoicePhrase')));
+    await tester.pump();
+
+    expect(fixture.speech.startCalls, 1);
+    expect(fixture.recorder.startedIds, hasLength(1));
+  });
+
+  testWidgets(
+    'recognition error with audio keeps coordinated recording enabled',
+    (tester) async {
+      final fixture = await _pumpEditor(tester, const [original]);
+      fixture.speech.result = SpeechRecognitionResult(
+        audioPath: '/recording.wav',
+        error: StateError('recognizer failed'),
+      );
+
+      await recordNewVoicePhrase(tester);
+      await tester.tap(find.byKey(const Key('addVoicePhrase')));
+      await tester.pump();
+
+      expect(fixture.speech.startCalls, 2);
+      expect(fixture.recorder.startedIds, isEmpty);
+    },
+  );
 
   testWidgets('background cancels an active speech-recognition recording', (
     tester,
@@ -191,18 +226,26 @@ String textFor(WidgetTester tester, String id) => tester
     .text;
 
 class _EditorFixture {
-  final recorder = FakeRecorder();
-  final speech = FakeSpeechRecognition();
+  late final recorder = FakeRecorder(events);
+  late final speech = FakeSpeechRecognition(events);
   final player = FakePlayer();
+  final events = <String>[];
 }
 
 class FakeRecorder implements PhraseRecordingService {
+  FakeRecorder(this.events);
+
+  final List<String> events;
   final List<String> startedIds = [];
   final List<String?> deletedPaths = [];
   String? stopPath = '/fallback.m4a';
 
   @override
-  Future<void> start(String phraseId) async => startedIds.add(phraseId);
+  Future<void> start(String phraseId) async {
+    events.add('recorder.start');
+    startedIds.add(phraseId);
+  }
+
   @override
   Future<String?> stop() async => stopPath;
   @override
@@ -214,9 +257,13 @@ class FakeRecorder implements PhraseRecordingService {
 }
 
 class FakeSpeechRecognition implements SpeechRecognitionService {
+  FakeSpeechRecognition(this.events);
+
+  final List<String> events;
   int startCalls = 0;
   int cancelCalls = 0;
   Object? startError;
+  Object? stopError;
   SpeechRecognitionResult result = const SpeechRecognitionResult(
     audioPath: '/recording.wav',
   );
@@ -225,14 +272,23 @@ class FakeSpeechRecognition implements SpeechRecognitionService {
   Future<bool> isAvailable() async => startError == null;
   @override
   Future<void> start(String phraseId) async {
+    events.add('speech.start');
     startCalls++;
     if (startError != null) throw startError!;
   }
 
   @override
-  Future<SpeechRecognitionResult> stop() async => result;
+  Future<SpeechRecognitionResult> stop() async {
+    if (stopError != null) throw stopError!;
+    return result;
+  }
+
   @override
-  Future<void> cancel() async => cancelCalls++;
+  Future<void> cancel() async {
+    events.add('speech.cancel');
+    cancelCalls++;
+  }
+
   @override
   Future<void> dispose() async {}
 }

@@ -35,6 +35,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
   final Set<String> _emptyRecordedPhraseIds = {};
   String? _recordingId;
   bool _recognitionActive = false;
+  bool _coordinatedRecordingUnavailable = false;
 
   @override
   void initState() {
@@ -87,12 +88,26 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
     if (_recordingId != null) return;
 
     try {
-      try {
-        await _speechRecognition.start(phrase.id);
-        _recognitionActive = true;
-      } catch (_) {
+      if (!_coordinatedRecordingUnavailable) {
+        try {
+          await _speechRecognition.start(phrase.id);
+          _recognitionActive = true;
+        } catch (_) {
+          await _speechRecognition.cancel();
+          _coordinatedRecordingUnavailable = true;
+        }
+      }
+      if (!_recognitionActive) {
         await _recorder.start(phrase.id);
-        _recognitionActive = false;
+        if (mounted && _coordinatedRecordingUnavailable) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Распознавание недоступно, используется обычная запись',
+              ),
+            ),
+          );
+        }
       }
       if (mounted) setState(() => _recordingId = phrase.id);
     } catch (_) {
@@ -137,10 +152,17 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
           ),
         );
       }
+    } on EmptyAudioRecordingException {
+      _coordinatedRecordingUnavailable = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось записать звук')),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось завершить запись')),
+          const SnackBar(content: Text('Не удалось записать звук')),
         );
       }
     } finally {

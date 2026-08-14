@@ -66,6 +66,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun convertWavToM4a(sourcePath: String, destinationPath: String) {
+        check(wavAudioPayloadSize(sourcePath) >= 1024) { "WAV file has no audio samples" }
         val extractor = MediaExtractor()
         var encoder: MediaCodec? = null
         var muxer: MediaMuxer? = null
@@ -179,5 +180,38 @@ class MainActivity : FlutterActivity() {
             if (muxerStarted) runCatching { muxer?.stop() }
             muxer?.release()
         }
+    }
+
+    private fun wavAudioPayloadSize(path: String): Long {
+        val file = File(path)
+        if (!file.isFile || file.length() < 12) return 0
+        file.inputStream().use { input ->
+            val header = ByteArray(12)
+            if (input.read(header) != header.size ||
+                String(header, 0, 4) != "RIFF" ||
+                String(header, 8, 4) != "WAVE"
+            ) return 0
+            val chunkHeader = ByteArray(8)
+            var position = 12L
+            while (input.read(chunkHeader) == chunkHeader.size) {
+                position += chunkHeader.size
+                val size = (chunkHeader[4].toLong() and 0xff) or
+                    ((chunkHeader[5].toLong() and 0xff) shl 8) or
+                    ((chunkHeader[6].toLong() and 0xff) shl 16) or
+                    ((chunkHeader[7].toLong() and 0xff) shl 24)
+                if (String(chunkHeader, 0, 4) == "data") {
+                    return if (size <= file.length() - position) size else 0
+                }
+                val toSkip = size + (size and 1)
+                var skipped = 0L
+                while (skipped < toSkip) {
+                    val count = input.skip(toSkip - skipped)
+                    if (count <= 0) return 0
+                    skipped += count
+                }
+                position += toSkip
+            }
+        }
+        return 0
     }
 }

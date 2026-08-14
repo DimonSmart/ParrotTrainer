@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:stt_record/stt_record.dart';
 
+import 'wav_audio_validator.dart';
+
 class SpeechRecognitionResult {
   const SpeechRecognitionResult({
     required this.audioPath,
@@ -26,12 +28,51 @@ abstract interface class SpeechRecognitionService {
   Future<void> dispose();
 }
 
+abstract interface class CoordinatedSpeechSession {
+  Stream<SttRecordTranscript> get transcripts;
+  Future<bool> hasPermission();
+  Future<bool> requestPermission();
+  Future<void> start({required String localeId});
+  Future<String> stop();
+  Future<void> cancel();
+}
+
+class SttRecordSession implements CoordinatedSpeechSession {
+  SttRecordSession({SttRecord? stt}) : _stt = stt ?? SttRecord();
+
+  final SttRecord _stt;
+
+  @override
+  Stream<SttRecordTranscript> get transcripts => _stt.transcripts;
+
+  @override
+  Future<bool> hasPermission() => _stt.hasPermission();
+
+  @override
+  Future<bool> requestPermission() => _stt.requestPermission();
+
+  @override
+  Future<void> start({required String localeId}) =>
+      _stt.start(localeId: localeId, partialResults: true);
+
+  @override
+  Future<String> stop() async => (await _stt.stop()).audioPath;
+
+  @override
+  Future<void> cancel() => _stt.cancel();
+}
+
+class EmptyAudioRecordingException implements Exception {
+  const EmptyAudioRecordingException();
+}
+
 /// Uses one native microphone session for both recording and system speech
 /// recognition, so the recognizer never competes with a second recorder.
 class SystemSpeechRecognitionService implements SpeechRecognitionService {
-  SystemSpeechRecognitionService({SttRecord? stt}) : _stt = stt ?? SttRecord();
+  SystemSpeechRecognitionService({CoordinatedSpeechSession? session})
+    : _session = session ?? SttRecordSession();
 
-  final SttRecord _stt;
+  final CoordinatedSpeechSession _session;
   StreamSubscription<SttRecordTranscript>? _transcriptSubscription;
   String? _phraseId;
   String _latestText = '';
@@ -40,7 +81,7 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
 
   @override
   Future<bool> isAvailable() async =>
-      await _isPlatformSupported() && await _stt.hasPermission();
+      await _isPlatformSupported() && await _session.hasPermission();
 
   @override
   Future<void> start(String phraseId) async {
@@ -49,26 +90,23 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
         'Coordinated speech recognition requires Android 13 or newer',
       );
     }
-    if (!await _stt.requestPermission()) {
+    if (!await _session.requestPermission()) {
       throw StateError('Speech recognition permission was not granted');
     }
     _phraseId = phraseId;
     _latestText = '';
     _recognitionError = null;
     await _transcriptSubscription?.cancel();
-    _transcriptSubscription = _stt.transcripts.listen((result) {
+    _transcriptSubscription = _session.transcripts.listen((result) {
       final text = result.text.trim();
       if (text.isNotEmpty) _latestText = text;
     }, onError: (Object error) => _recognitionError = error);
     try {
-      await _stt.start(
+      await _session.start(
         localeId: PlatformDispatcher.instance.locale.toLanguageTag(),
-        partialResults: true,
       );
     } catch (_) {
-      await _transcriptSubscription?.cancel();
-      _transcriptSubscription = null;
-      _phraseId = null;
+      await _cleanupSession();
       rethrow;
     }
   }
@@ -84,14 +122,18 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
     final phraseId = _phraseId;
     if (phraseId == null) throw StateError('Recognition is not running');
     String sourcePath;
+    var stopped = false;
     try {
-      sourcePath = (await _stt.stop()).audioPath;
-    } catch (_) {
-      rethrow;
+      sourcePath = await _session.stop();
+      stopped = true;
     } finally {
-      await _transcriptSubscription?.cancel();
-      _transcriptSubscription = null;
-      _phraseId = null;
+      await _cleanupSession(cancelNative: !stopped);
+    }
+
+    final source = File(sourcePath);
+    if (!await hasWavAudioPayload(source)) {
+      await _deleteIfExists(source);
+      throw const EmptyAudioRecordingException();
     }
 
     final directory = await getApplicationDocumentsDirectory();
@@ -133,15 +175,27 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
 
   @override
   Future<void> cancel() async {
+    await _cleanupSession();
+  }
+
+  Future<void> _cleanupSession({bool cancelNative = true}) async {
     await _transcriptSubscription?.cancel();
     _transcriptSubscription = null;
     _phraseId = null;
-    await _stt.cancel();
+    _latestText = '';
+    _recognitionError = null;
+    if (!cancelNative) return;
+    try {
+      await _session.cancel();
+    } catch (_) {
+      // Native cleanup is best-effort and must remain safe to repeat.
+    }
+  }
+
+  Future<void> _deleteIfExists(File file) async {
+    if (await file.exists()) await file.delete();
   }
 
   @override
-  Future<void> dispose() async {
-    await _transcriptSubscription?.cancel();
-    _transcriptSubscription = null;
-  }
+  Future<void> dispose() => _cleanupSession();
 }
