@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/app_controller.dart';
 import '../controllers/training_session_controller.dart';
+import '../models/training_phrase.dart';
 import '../services/sound_detector.dart';
 import 'phrase_editor_screen.dart';
 import 'voices_screen.dart';
@@ -171,7 +172,7 @@ class _PhrasesCard extends StatelessWidget {
   const _PhrasesCard({required this.controller});
   final AppController controller;
   Future<void> _open(BuildContext context) async {
-    final phrases = await Navigator.push<List<String>>(
+    final phrases = await Navigator.push<List<TrainingPhrase>>(
       context,
       MaterialPageRoute(
         builder: (_) =>
@@ -201,7 +202,7 @@ class _PhrasesCard extends StatelessWidget {
           .map(
             (phrase) => Padding(
               padding: const EdgeInsets.only(bottom: 7),
-              child: Text(phrase, style: const TextStyle(fontSize: 18)),
+              child: Text(phrase.text, style: const TextStyle(fontSize: 18)),
             ),
           )
           .toList(),
@@ -282,6 +283,12 @@ class _MicrophoneCard extends StatelessWidget {
               ),
             ),
             divisions: 80,
+          ),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: controller.calibrating ? null : controller.calibrateMicrophone,
+            icon: const Icon(Icons.tune),
+            label: Text(controller.calibrating ? 'Калибровка… ${controller.calibrationSecondsLeft} сек' : 'Калибровать микрофон'),
           ),
         ],
       ),
@@ -369,23 +376,24 @@ class _IntervalsCard extends StatelessWidget {
               controller.updateSettings(
                 settings.copyWith(
                   minimumInterval: min,
-                  maximumInterval: settings.maximumInterval < min ? min : null,
+                  idlePromptMinInterval: settings.idlePromptMinInterval < min ? min : null,
+                  idlePromptMaxInterval: settings.idlePromptMaxInterval < min ? min : null,
                 ),
               );
             },
           ),
           _DurationSlider(
-            label: 'Максимальный интервал',
-            value: settings.maximumInterval.inSeconds.toDouble().clamp(5, 120),
+            label: 'Инициировать разговор до',
+            value: settings.idlePromptMaxInterval.inSeconds.toDouble().clamp(5, 180),
             min: 5,
-            max: 120,
+            max: 180,
             suffix: 'сек',
-            divisions: 115,
+            divisions: 175,
             onChanged: (value) {
               final max = Duration(seconds: value.round());
               controller.updateSettings(
                 settings.copyWith(
-                  maximumInterval: max,
+                  idlePromptMaxInterval: max,
                   minimumInterval: settings.minimumInterval > max ? max : null,
                 ),
               );
@@ -467,8 +475,8 @@ class _VoicesCard extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => VoicesScreen(controller: controller)),
       ),
-      child: Row(
-        children: [
+      child: Column(children: [
+        Row(children: [
           Expanded(
             child: Text(
               selected == 0
@@ -503,8 +511,10 @@ class _VoicesCard extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           const Icon(Icons.chevron_right),
-        ],
-      ),
+        ]),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(onPressed: controller.session.lastPhrase == null ? null : controller.markGoodAttempt, icon: const Icon(Icons.star_outline), label: const Text('Хорошая попытка')),
+      ]),
     );
   }
 }

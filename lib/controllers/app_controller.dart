@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/training_settings.dart';
 import '../models/training_statistics.dart';
 import '../services/audio_level_service.dart';
+import '../services/calibration.dart';
 import '../services/keep_screen_on_service.dart';
 import '../services/repositories.dart';
 import '../services/sound_detector.dart';
@@ -38,6 +39,10 @@ class AppController extends ChangeNotifier {
   bool initialized = false;
   bool microphoneAvailable = true;
   double currentLevelDb = -80;
+  bool calibrating = false;
+  int calibrationSecondsLeft = 0;
+  final List<double> _calibrationSamples = [];
+  DateTime? _calibrationStartedAt;
 
   Future<void> initialize() async {
     settings = await _settingsRepository.load();
@@ -61,6 +66,8 @@ class AppController extends ChangeNotifier {
     session.addListener(_sessionChanged);
     _levelSubscription = _audio.levels.listen((level) {
       currentLevelDb = level;
+      final started = _calibrationStartedAt;
+      if (calibrating && started != null && DateTime.now().difference(started) >= const Duration(seconds: 2)) _calibrationSamples.add(level);
       session.handleAudioLevel(level);
       notifyListeners();
     });
@@ -142,6 +149,25 @@ class AppController extends ChangeNotifier {
     await _statisticsRepository.reset();
     notifyListeners();
   }
+
+  Future<void> calibrateMicrophone() async {
+    if (calibrating) return;
+    await stopTraining();
+    calibrating = true;
+    _calibrationSamples.clear();
+    _calibrationStartedAt = DateTime.now();
+    for (var remaining = 10; remaining > 0; remaining--) {
+      calibrationSecondsLeft = remaining;
+      notifyListeners();
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    final threshold = MicrophoneCalibration.threshold(samples: _calibrationSamples, minimum: -80, maximum: 0);
+    calibrating = false;
+    calibrationSecondsLeft = 0;
+    await updateSettings(settings.copyWith(soundThresholdDb: threshold));
+  }
+
+  void markGoodAttempt() => session.markGoodAttempt();
 
   Future<void> previewVoice(TtsVoice voice) async {
     await session.stop();

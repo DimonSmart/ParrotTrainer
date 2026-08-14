@@ -1,288 +1,47 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
-
+import '../models/training_phrase.dart';
 import '../models/training_settings.dart';
 import '../models/training_statistics.dart';
+import '../services/recorded_phrase_player.dart';
 import '../services/sound_detector.dart';
 import '../services/sources.dart';
 import '../services/tts_service.dart';
 
-enum TrainingState {
-  stopped,
-  minimumInterval,
-  listening,
-  soundDetected,
-  waitingForSilence,
-  speaking,
-}
-
-enum SpeechReason { responseToSound, timeout }
+enum TrainingState { stopped, minimumInterval, listening, soundDetected, waitingForSilence, speaking, postSpeechGuard, quietPeriod }
+enum SpeechReason { responseToSound, idle }
 
 class TrainingSessionController extends ChangeNotifier {
-  TrainingSessionController({
-    required TrainingSettings initialSettings,
-    required TrainingStatistics initialStatistics,
-    required SoundDetector soundDetector,
-    required TtsService ttsService,
-    required Clock sessionClock,
-    required RandomSource randomSource,
-    this.onStatisticsChanged,
-    bool enableAutomaticTicks = true,
-  }) : _settings = initialSettings,
-       _statistics = initialStatistics,
-       _detector = soundDetector,
-       _tts = ttsService,
-       _clock = sessionClock,
-       _random = randomSource,
-       _autoTick = enableAutomaticTicks;
-
-  TrainingSettings _settings;
-  TrainingStatistics _statistics;
-  final SoundDetector _detector;
-  final TtsService _tts;
-  final Clock _clock;
-  final RandomSource _random;
-  final bool _autoTick;
-  final Future<void> Function(TrainingStatistics)? onStatisticsChanged;
-  Timer? _timer;
-  DateTime? _cycleStartedAt;
-  DateTime? _lastSoundAt;
-  bool _hasSoundSinceLastSpeech = false;
-  bool _isSoundActive = false;
-  bool _running = false;
-  int _operation = 0;
-  String? _previousPhrase;
-  String? _previousVoiceId;
-  List<TtsVoice> _voices = [];
-
-  TrainingState state = TrainingState.stopped;
-  bool get isRunning => _running;
-  bool get isSoundActive => _isSoundActive;
-  double get currentLevelDb => _detector.currentLevelDb;
-  TrainingStatistics get statistics => _statistics;
-  DateTime? get cycleStartedAt => _cycleStartedAt;
-
-  DateTime? get nextSpeechAt {
-    if (!_running ||
-        state == TrainingState.speaking ||
-        _cycleStartedAt == null) {
-      return null;
-    }
-    final minimumEndsAt = _cycleStartedAt!.add(_settings.minimumInterval);
-    if (!_hasSoundSinceLastSpeech) {
-      return _cycleStartedAt!.add(_settings.maximumInterval);
-    }
-    if (_isSoundActive || _lastSoundAt == null) return null;
-    final silenceEndsAt = _lastSoundAt!.add(_settings.silenceAfterSound);
-    return silenceEndsAt.isAfter(minimumEndsAt) ? silenceEndsAt : minimumEndsAt;
-  }
-
-  Duration? get timeUntilNextSpeech {
-    final target = nextSpeechAt;
-    if (target == null) return null;
-    final remaining = target.difference(_clock.now());
-    return remaining.isNegative ? Duration.zero : remaining;
-  }
-
-  double? get nextSpeechProgress {
-    final target = nextSpeechAt;
-    if (target == null || _cycleStartedAt == null) return null;
-    final total = target.difference(_cycleStartedAt!).inMilliseconds;
-    if (total <= 0) return 1;
-    final elapsed = _clock.now().difference(_cycleStartedAt!).inMilliseconds;
-    return (elapsed / total).clamp(0, 1);
-  }
-
-  String get stateLabel => switch (state) {
-    TrainingState.stopped => 'Программа выключена',
-    TrainingState.minimumInterval => 'Защитный интервал',
-    TrainingState.listening => 'Слушаю',
-    TrainingState.soundDetected => 'Слышу попугая',
-    TrainingState.waitingForSilence => 'Жду тишины',
-    TrainingState.speaking => 'Говорю',
-  };
-
-  void updateSettings(TrainingSettings value) {
-    _settings = value;
-    _detector.setThreshold(value.soundThresholdDb);
-    if (_running) tick();
-    notifyListeners();
-  }
-
-  void updateStatistics(TrainingStatistics value) {
-    _statistics = value;
-    notifyListeners();
-  }
-
-  void updateVoices(List<TtsVoice> value) => _voices = value;
-
-  void start() {
-    if (_running) return;
-    _running = true;
-    _operation++;
-    _resetCycle(_clock.now());
-    if (_autoTick) {
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (_) => tick());
-    }
-    notifyListeners();
-  }
-
-  Future<void> stop() async {
-    if (!_running && state == TrainingState.stopped) return;
-    _running = false;
-    _operation++;
-    _timer?.cancel();
-    _timer = null;
-    await _tts.stop();
-    _detector.reset();
-    _isSoundActive = false;
-    state = TrainingState.stopped;
-    notifyListeners();
-  }
-
-  void handleAudioLevel(double levelDb) {
-    if (state == TrainingState.speaking) return;
-    final transition = _detector.addSample(levelDb, _clock.now());
-    if (transition == SoundTransition.started) handleSoundChanged(true);
-    if (transition == SoundTransition.ended) handleSoundChanged(false);
-    notifyListeners();
-  }
-
-  @visibleForTesting
-  void handleSoundChanged(bool active) {
-    if (!_running ||
-        state == TrainingState.speaking ||
-        active == _isSoundActive) {
-      return;
-    }
-    final now = _clock.now();
-    _isSoundActive = active;
-    if (active) {
-      _hasSoundSinceLastSpeech = true;
-      _lastSoundAt = now;
-      _statistics = _statistics.copyWith(
-        soundEvents: _statistics.soundEvents + 1,
-      );
-      unawaited(onStatisticsChanged?.call(_statistics));
-      state = TrainingState.soundDetected;
-    } else {
-      _lastSoundAt = now;
-      state = TrainingState.waitingForSilence;
-    }
-    notifyListeners();
-    tick();
-  }
-
-  @visibleForTesting
-  void tick() {
-    if (!_running ||
-        state == TrainingState.speaking ||
-        _cycleStartedAt == null) {
-      return;
-    }
-    final now = _clock.now();
-    if (_isSoundActive) {
-      _lastSoundAt = now;
-      state = TrainingState.soundDetected;
-      notifyListeners();
-      return;
-    }
-
-    final elapsed = now.difference(_cycleStartedAt!);
-    if (elapsed < _settings.minimumInterval) {
-      state = TrainingState.minimumInterval;
-      notifyListeners();
-      return;
-    }
-
-    if (_hasSoundSinceLastSpeech) {
-      final silentFor = _lastSoundAt == null
-          ? Duration.zero
-          : now.difference(_lastSoundAt!);
-      if (silentFor >= _settings.silenceAfterSound) {
-        unawaited(_speak(SpeechReason.responseToSound));
-      } else {
-        state = TrainingState.waitingForSilence;
-        notifyListeners();
-      }
-      return;
-    }
-
-    if (elapsed >= _settings.maximumInterval) {
-      unawaited(_speak(SpeechReason.timeout));
-    } else {
-      state = TrainingState.listening;
-      notifyListeners();
-    }
-  }
-
-  Future<void> _speak(SpeechReason reason) async {
+  TrainingSessionController({required TrainingSettings initialSettings, required TrainingStatistics initialStatistics, required SoundDetector soundDetector, required TtsService ttsService, required Clock sessionClock, required RandomSource randomSource, RecordedPhrasePlayer? recordedPhrasePlayer, this.onStatisticsChanged, bool enableAutomaticTicks = true}) : _settings = initialSettings, _statistics = initialStatistics, _detector = soundDetector, _tts = ttsService, _clock = sessionClock, _random = randomSource, _recordedPlayer = recordedPhrasePlayer ?? LocalRecordedPhrasePlayer(), _autoTick = enableAutomaticTicks;
+  static const postSpeechGuard = Duration(milliseconds: 500), birdReplyWindow = Duration(seconds: 10), quietPeriodDuration = Duration(minutes: 5), maxDeferredReplyDelay = Duration(seconds: 2);
+  TrainingSettings _settings; TrainingStatistics _statistics; final SoundDetector _detector; final TtsService _tts; final RecordedPhrasePlayer _recordedPlayer; final Clock _clock; final RandomSource _random; final bool _autoTick; final Future<void> Function(TrainingStatistics)? onStatisticsChanged;
+  Timer? _timer; DateTime? _cycleStartedAt, _lastSoundAt, _idleDeadline, _guardEndsAt, _replyWindowEndsAt, _quietEndsAt; bool _hasSound = false, _isSoundActive = false, _replyRecorded = false, _running = false; int _operation = 0; String? _previousVoiceId; TrainingPhrase? _lastPhrase; List<TtsVoice> _voices = [];
+  TrainingState state = TrainingState.stopped; bool get isRunning => _running; bool get isSoundActive => _isSoundActive; double get currentLevelDb => _detector.currentLevelDb; TrainingStatistics get statistics => _statistics; TrainingPhrase? get lastPhrase => _lastPhrase; DateTime? get cycleStartedAt => _cycleStartedAt;
+  DateTime? get nextSpeechAt { if (!_running || state == TrainingState.speaking || state == TrainingState.postSpeechGuard || state == TrainingState.quietPeriod) return null; if (_hasSound && !_isSoundActive && _lastSoundAt != null) { final natural = _lastSoundAt!.add(_settings.silenceAfterSound); final min = _cycleStartedAt!.add(_settings.minimumInterval); final allowed = natural.isAfter(min) ? natural : min; return allowed.difference(natural) <= maxDeferredReplyDelay ? allowed : null; } return _idleDeadline; }
+  Duration? get timeUntilNextSpeech => nextSpeechAt == null ? null : (nextSpeechAt!.difference(_clock.now()).isNegative ? Duration.zero : nextSpeechAt!.difference(_clock.now()));
+  double? get nextSpeechProgress { final target = nextSpeechAt; if (target == null || _cycleStartedAt == null) return null; final total = target.difference(_cycleStartedAt!).inMilliseconds; return total <= 0 ? 1 : (_clock.now().difference(_cycleStartedAt!).inMilliseconds / total).clamp(0, 1); }
+  String get stateLabel => switch(state) { TrainingState.stopped => 'Программа выключена', TrainingState.minimumInterval => 'Защитный интервал', TrainingState.listening => 'Слушаю', TrainingState.soundDetected => 'Слышу попугая', TrainingState.waitingForSilence => 'Жду тишины', TrainingState.speaking => 'Говорю', TrainingState.postSpeechGuard => 'Слушаю…', TrainingState.quietPeriod => 'Тихая пауза' };
+  void updateSettings(TrainingSettings value) { _settings = value; _detector.setThreshold(value.soundThresholdDb); if (_running) tick(); notifyListeners(); }
+  void updateStatistics(TrainingStatistics value) { _statistics = value; notifyListeners(); } void updateVoices(List<TtsVoice> value) => _voices = value;
+  void start() { if (_running) return; _running = true; _operation++; _resetCycle(_clock.now()); if (_autoTick) _timer = Timer.periodic(const Duration(milliseconds: 100), (_) => tick()); notifyListeners(); }
+  Future<void> stop() async { if (!_running && state == TrainingState.stopped) return; _running = false; _operation++; _timer?.cancel(); _timer = null; await _tts.stop(); await _recordedPlayer.stop(); _detector.reset(); _isSoundActive = false; state = TrainingState.stopped; notifyListeners(); }
+  void handleAudioLevel(double levelDb) { if (state == TrainingState.speaking || state == TrainingState.postSpeechGuard) return; final transition = _detector.addSample(levelDb, _clock.now()); if (transition == SoundTransition.started) handleSoundChanged(true); if (transition == SoundTransition.ended) handleSoundChanged(false); notifyListeners(); }
+  @visibleForTesting void handleSoundChanged(bool active) { if (!_running || state == TrainingState.speaking || state == TrainingState.postSpeechGuard || active == _isSoundActive) return; final now = _clock.now(); _isSoundActive = active; if (active) { _hasSound = true; _lastSoundAt = now; if (_replyWindowEndsAt != null && now.isBefore(_replyWindowEndsAt!) && !_replyRecorded) { _replyRecorded = true; _statistics = _statistics.copyWith(birdRepliesAfterApp: _statistics.birdRepliesAfterApp + 1); } _quietEndsAt = null; _statistics = _statistics.copyWith(soundEvents: _statistics.soundEvents + 1); _saveStats(); state = TrainingState.soundDetected; } else { _lastSoundAt = now; state = TrainingState.waitingForSilence; } notifyListeners(); tick(); }
+  @visibleForTesting void tick() {
     if (!_running || state == TrainingState.speaking) return;
-    final operation = _operation;
-    state = TrainingState.speaking;
-    _detector.reset();
-    _isSoundActive = false;
-    notifyListeners();
-
-    final phrase = _pickAvoiding(_settings.phrases, _previousPhrase);
-    _previousPhrase = phrase;
-    final enabled = _voices
-        .where((voice) => _settings.selectedVoiceIds.contains(voice.id))
-        .toList();
-    final voice = enabled.isEmpty
-        ? null
-        : _pickVoiceAvoiding(enabled, _previousVoiceId);
-    _previousVoiceId = voice?.id;
-    try {
-      await _tts.speak(phrase, _settings, voice);
-      if (!_running || operation != _operation) return;
-      _statistics = _statistics.copyWith(
-        totalPhrasesSpoken: _statistics.totalPhrasesSpoken + 1,
-        responsesToSound:
-            _statistics.responsesToSound +
-            (reason == SpeechReason.responseToSound ? 1 : 0),
-        timeoutPhrases:
-            _statistics.timeoutPhrases +
-            (reason == SpeechReason.timeout ? 1 : 0),
-      );
-      await onStatisticsChanged?.call(_statistics);
-      _resetCycle(_clock.now());
-      notifyListeners();
-    } catch (_) {
-      if (_running && operation == _operation) {
-        _resetCycle(_clock.now());
-        notifyListeners();
-      }
-    }
+    final now = _clock.now();
+    if (state == TrainingState.postSpeechGuard) { if (_guardEndsAt != null && !now.isBefore(_guardEndsAt!)) { _replyWindowEndsAt = now.add(birdReplyWindow); _resetCycle(now, preserveReplyWindow: true); } return; }
+    if (state == TrainingState.quietPeriod) { if (_quietEndsAt != null && !now.isBefore(_quietEndsAt!)) _resetCycle(now); return; }
+    if (_isSoundActive) { state = TrainingState.soundDetected; return; }
+    final due = nextSpeechAt;
+    if (_hasSound && _lastSoundAt != null) { final natural = _lastSoundAt!.add(_settings.silenceAfterSound); if (due == null && !now.isBefore(natural)) { _hasSound = false; _resetCycle(now, preserveReplyWindow: true); return; } if (due != null && !now.isBefore(due)) { unawaited(_speak(SpeechReason.responseToSound)); } else { state = TrainingState.waitingForSilence; notifyListeners(); } return; }
+    if (due != null && !now.isBefore(due)) { unawaited(_speak(SpeechReason.idle)); } else { state = now.isBefore(_cycleStartedAt!.add(_settings.minimumInterval)) ? TrainingState.minimumInterval : TrainingState.listening; notifyListeners(); }
   }
-
-  String _pickAvoiding(List<String> values, String? previous) {
-    final choices = values.length > 1
-        ? values.where((value) => value != previous).toList()
-        : values;
-    return choices[_random.nextInt(choices.length)];
-  }
-
-  TtsVoice _pickVoiceAvoiding(List<TtsVoice> values, String? previous) {
-    final choices = values.length > 1
-        ? values.where((value) => value.id != previous).toList()
-        : values;
-    return choices[_random.nextInt(choices.length)];
-  }
-
-  void _resetCycle(DateTime now) {
-    _cycleStartedAt = now;
-    _lastSoundAt = null;
-    _hasSoundSinceLastSpeech = false;
-    _isSoundActive = false;
-    _detector.reset();
-    state = TrainingState.minimumInterval;
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  Future<void> _speak(SpeechReason reason) async { if (!_running || state == TrainingState.speaking) return; final operation = _operation; state = TrainingState.speaking; _detector.reset(); _isSoundActive = false; notifyListeners(); final phrase = _pickWeighted(_settings.phrases); _lastPhrase = phrase; final enabled = _voices.where((v) => _settings.selectedVoiceIds.contains(v.id)).toList(); final voice = enabled.isEmpty ? null : _pickVoiceAvoiding(enabled, _previousVoiceId); _previousVoiceId = voice?.id; try { final played = await _recordedPlayer.playIfAvailable(phrase.recordedAudioPath); if (!played) await _tts.speak(phrase.text, _settings, voice); if (!_running || operation != _operation) return; _statistics = _statistics.copyWith(totalPhrasesSpoken: _statistics.totalPhrasesSpoken + 1, responsesToSound: _statistics.responsesToSound + (reason == SpeechReason.responseToSound ? 1 : 0), timeoutPhrases: _statistics.timeoutPhrases + (reason == SpeechReason.idle ? 1 : 0), birdReplyOpportunities: _statistics.birdReplyOpportunities + 1); await _saveStats(); _replyRecorded = false; _guardEndsAt = _clock.now().add(postSpeechGuard); state = TrainingState.postSpeechGuard; notifyListeners(); } catch (_) { if (_running && operation == _operation) _resetCycle(_clock.now()); notifyListeners(); } }
+  TrainingPhrase _pickWeighted(List<TrainingPhrase> phrases) { var remaining = 0.0; for (var i=0; i<phrases.length; i++) { remaining += 1 / (1 << i); } var point = _random.nextDouble() * remaining; for (var i=0; i<phrases.length; i++) { point -= 1 / (1 << i); if (point <= 0) return phrases[i]; } return phrases.last; }
+  TtsVoice _pickVoiceAvoiding(List<TtsVoice> values, String? previous) { final choices = values.length > 1 ? values.where((v) => v.id != previous).toList() : values; return choices[_random.nextInt(choices.length)]; }
+  void markGoodAttempt() { final phrase = _lastPhrase; if (phrase == null) return; final values = Map<String,int>.from(_statistics.successfulAttemptsByPhrase); values[phrase.id] = (values[phrase.id] ?? 0) + 1; _statistics = _statistics.copyWith(successfulAttemptsByPhrase: values); _saveStats(); notifyListeners(); }
+  void _resetCycle(DateTime now, {bool preserveReplyWindow = false}) { _cycleStartedAt = now; _lastSoundAt = null; _hasSound = false; _isSoundActive = false; _detector.reset(); _idleDeadline = now.add(_settings.idlePromptMinInterval + Duration(milliseconds: ((_settings.idlePromptMaxInterval - _settings.idlePromptMinInterval).inMilliseconds * _random.nextDouble()).round())); if (!preserveReplyWindow) _replyWindowEndsAt = null; state = TrainingState.minimumInterval; }
+  Future<void> _saveStats() async => onStatisticsChanged?.call(_statistics);
+  @override void dispose() { _timer?.cancel(); super.dispose(); }
 }

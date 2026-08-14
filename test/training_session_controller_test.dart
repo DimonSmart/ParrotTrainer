@@ -178,7 +178,10 @@ Future<void> flushAsync() => Future<void>.delayed(Duration.zero);
 class Fixture {
   Fixture({FakeTts? tts}) : tts = tts ?? FakeTts() {
     controller = TrainingSessionController(
-      initialSettings: TrainingSettings.defaults,
+      initialSettings: TrainingSettings.defaults.copyWith(
+        idlePromptMinInterval: const Duration(seconds: 30),
+        idlePromptMaxInterval: const Duration(seconds: 30),
+      ),
       initialStatistics: const TrainingStatistics(),
       soundDetector: FakeDetector(),
       ttsService: this.tts,
@@ -202,6 +205,8 @@ class FakeClock implements Clock {
 class FixedRandom implements RandomSource {
   @override
   int nextInt(int max) => 0;
+  @override
+  double nextDouble() => 0;
 }
 
 class FakeDetector implements SoundDetector {

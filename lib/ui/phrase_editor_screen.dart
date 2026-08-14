@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/training_phrase.dart';
 
 class PhraseEditorScreen extends StatefulWidget {
   const PhraseEditorScreen({super.key, required this.phrases});
-  final List<String> phrases;
+  final List<TrainingPhrase> phrases;
 
   @override
   State<PhraseEditorScreen> createState() => _PhraseEditorScreenState();
@@ -10,7 +11,7 @@ class PhraseEditorScreen extends StatefulWidget {
 
 class _PhraseEditorScreenState extends State<PhraseEditorScreen> {
   late final TextEditingController _controller = TextEditingController(
-    text: widget.phrases.join('\n\n'),
+    text: widget.phrases.map((phrase) => phrase.text).join('\n\n'),
   );
 
   void _save() {
@@ -18,7 +19,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen> {
         .split(RegExp(r'\n\s*\n+'))
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
-        .toList();
+        .map((text) => TrainingPhrase(id: TrainingPhrase.newId(), text: text)).toList();
     if (phrases.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Добавьте хотя бы одну фразу')),
