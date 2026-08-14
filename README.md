@@ -25,4 +25,8 @@ Everything is available from one screen: place the phone near the cage, tune the
 
 > Parrot Trainer is a training aid, not a guarantee that a bird will learn to speak. Every parrot learns differently.
 
+## Why interaction matters
+
+Parrot Trainer's call-and-response approach is inspired by research on vocal learning, social interaction, context, and contingency in parrots. Read [How Parrots Learn to Talk: What Science Tells Us About Vocal Learning](docs/how-parrots-learn-to-talk.md) for a research-oriented overview.
+
 Developer notes, build instructions, and implementation details are in [DEVELOPMENT.md](DEVELOPMENT.md).
