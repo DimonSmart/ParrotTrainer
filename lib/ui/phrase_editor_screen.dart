@@ -25,7 +25,8 @@ class PhraseEditorScreen extends StatefulWidget {
   State<PhraseEditorScreen> createState() => _PhraseEditorScreenState();
 }
 
-class _PhraseEditorScreenState extends State<PhraseEditorScreen> {
+class _PhraseEditorScreenState extends State<PhraseEditorScreen>
+    with WidgetsBindingObserver {
   late final PhraseRecordingService _recorder;
   late final SpeechRecognitionService _speechRecognition;
   late final RecordedPhrasePlayer _player;
@@ -42,8 +43,36 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen> {
     _speechRecognition =
         widget.speechRecognition ?? SystemSpeechRecognitionService();
     _player = widget.player ?? LocalRecordedPhrasePlayer();
+    WidgetsBinding.instance.addObserver(this);
     for (final phrase in _phrases) {
       _textControllers[phrase.id] = TextEditingController(text: phrase.text);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      unawaited(_cancelRecordingForBackground());
+    }
+  }
+
+  Future<void> _cancelRecordingForBackground() async {
+    if (_recordingId == null) return;
+    try {
+      if (_recognitionActive) {
+        await _speechRecognition.cancel();
+      } else {
+        await _recorder.cancel();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recordingId = null;
+          _recognitionActive = false;
+        });
+      }
     }
   }
 
@@ -294,8 +323,11 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_recordingId != null && _recognitionActive) {
       unawaited(_speechRecognition.cancel());
+    } else if (_recordingId != null) {
+      unawaited(_recorder.cancel());
     }
     for (final controller in _textControllers.values) {
       controller.dispose();

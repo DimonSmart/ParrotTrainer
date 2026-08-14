@@ -18,11 +18,32 @@ Parrot Trainer is a Flutter application for Android.
 flutter pub get
 flutter test
 flutter analyze
-flutter build apk --release
+flutter build appbundle --release
 ```
 
-The release APK is created at:
+The release App Bundle is created at:
 
 ```text
-build/app/outputs/flutter-apk/app-release.apk
+build/app/outputs/bundle/release/app-release.aab
 ```
+
+## Android release signing
+
+Create a separate upload key (never commit it):
+
+```shell
+keytool -genkeypair -v -keystore android/parrot-trainer-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Create `android/key.properties` locally:
+
+```properties
+storePassword=your-keystore-password
+keyPassword=your-key-password
+keyAlias=upload
+storeFile=parrot-trainer-upload.jks
+```
+
+Then run `flutter build appbundle --release`. `key.properties`, `.jks`, and
+`.keystore` files are ignored by Git. Without `key.properties` Gradle produces
+an unsigned, release-compatible bundle for CI checks.

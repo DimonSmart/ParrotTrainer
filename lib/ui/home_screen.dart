@@ -8,6 +8,9 @@ import '../models/training_phrase.dart';
 import '../services/sound_detector.dart';
 import 'phrase_editor_screen.dart';
 import 'voices_screen.dart';
+import 'privacy_policy_screen.dart';
+import '../l10n/generated/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.controller});
@@ -50,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
               title: const Text(
-                'Попугайчик учится говорить',
+                'Parrot Trainer',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
@@ -832,7 +835,9 @@ class _AppDrawer extends StatelessWidget {
   const _AppDrawer({required this.controller});
   final AppController controller;
   @override
-  Widget build(BuildContext context) => Drawer(
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
+    return Drawer(
     child: SafeArea(
       child: ListView(
         children: [
@@ -844,7 +849,7 @@ class _AppDrawer extends StatelessWidget {
               children: [
                 Text('🦜', style: TextStyle(fontSize: 46)),
                 Text(
-                  'Попугайчик учится говорить',
+                  'Parrot Trainer',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
                 ),
               ],
@@ -852,24 +857,36 @@ class _AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('О программе'),
-            onTap: () {
+            title: Text(strings.about),
+            onTap: () async {
               Navigator.pop(context);
+              final info = await PackageInfo.fromPlatform();
+              if (!context.mounted) return;
               showAboutDialog(
                 context: context,
-                applicationName: 'Попугайчик учится говорить',
-                applicationVersion: '1.0.0',
-                children: const [
+                applicationName: strings.appTitle,
+                applicationVersion: info.version,
+                children: [
                   Text(
-                    'Тренажёр помогает попугаю запоминать фразы, отвечая на звуки и периодически повторяя слова в тишине.',
+                    strings.aboutDescription,
                   ),
                 ],
               );
             },
           ),
           ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: Text(strings.privacyPolicy),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_backup_restore),
-            title: const Text('Сбросить настройки'),
+            title: Text(strings.resetSettings),
             onTap: () async {
               Navigator.pop(context);
               await controller.resetSettings();
@@ -877,7 +894,7 @@ class _AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.delete_outline),
-            title: const Text('Сбросить статистику'),
+            title: Text(strings.resetStatistics),
             onTap: () async {
               Navigator.pop(context);
               await controller.resetStatistics();
@@ -887,4 +904,5 @@ class _AppDrawer extends StatelessWidget {
       ),
     ),
   );
+  }
 }

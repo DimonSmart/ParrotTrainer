@@ -6,6 +6,7 @@ import 'package:record/record.dart';
 abstract interface class PhraseRecordingService {
   Future<void> start(String phraseId);
   Future<String?> stop();
+  Future<void> cancel();
   Future<void> delete(String? path);
   Future<void> dispose();
 }
@@ -35,6 +36,9 @@ class PhraseRecorder implements PhraseRecordingService {
 
   @override
   Future<String?> stop() => _recorder.stop();
+
+  @override
+  Future<void> cancel() => _recorder.cancel();
 
   @override
   Future<void> delete(String? path) async {

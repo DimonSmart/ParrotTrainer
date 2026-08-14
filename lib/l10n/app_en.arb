@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "appTitle": "Parrot Trainer",
+  "about": "About",
+  "privacyPolicy": "Privacy Policy",
+  "aboutDescription": "A training companion that repeats phrases in response to sounds and during quiet periods.",
+  "resetSettings": "Reset settings",
+  "resetStatistics": "Reset statistics",
+  "privacyTitle": "Privacy Policy",
+  "privacyBody": "Parrot Trainer uses the microphone to detect sounds and lets you record training phrases. Recordings, settings, and statistics are stored locally on your device.\n\nAndroid's selected speech-recognition provider may process audio according to its own policy. Parrot Trainer has no backend and does not send recordings to its own server.\n\nThe app shows no ads and does not sell your data."
+}

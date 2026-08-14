@@ -141,6 +141,20 @@ void main() {
     expect(lastText(tester), 'Вручную');
     expect(find.text('Не удалось начать запись'), findsNothing);
   });
+
+  testWidgets('background cancels an active speech-recognition recording', (
+    tester,
+  ) async {
+    final fixture = await _pumpEditor(tester, const [original]);
+    await tester.tap(find.byKey(const Key('addVoicePhrase')));
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+
+    expect(fixture.speech.cancelCalls, 1);
+    expect(find.text('Остановить'), findsNothing);
+  });
 }
 
 Future<_EditorFixture> _pumpEditor(
@@ -192,6 +206,8 @@ class FakeRecorder implements PhraseRecordingService {
   @override
   Future<String?> stop() async => stopPath;
   @override
+  Future<void> cancel() async {}
+  @override
   Future<void> delete(String? path) async => deletedPaths.add(path);
   @override
   Future<void> dispose() async {}
@@ -199,6 +215,7 @@ class FakeRecorder implements PhraseRecordingService {
 
 class FakeSpeechRecognition implements SpeechRecognitionService {
   int startCalls = 0;
+  int cancelCalls = 0;
   Object? startError;
   SpeechRecognitionResult result = const SpeechRecognitionResult(
     audioPath: '/recording.wav',
@@ -215,7 +232,7 @@ class FakeSpeechRecognition implements SpeechRecognitionService {
   @override
   Future<SpeechRecognitionResult> stop() async => result;
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async => cancelCalls++;
   @override
   Future<void> dispose() async {}
 }

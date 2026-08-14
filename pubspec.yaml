@@ -1,5 +1,5 @@
 name: parrot_trainer
-description: "A new Flutter project."
+description: "An Android training companion for practicing parrot speech."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -40,6 +40,9 @@ dependencies:
   path_provider: ^2.1.5
   just_audio: ^0.10.5
   stt_record: ^0.0.8
+  package_info_plus: ^9.0.0
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -57,6 +60,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

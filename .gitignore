@@ -47,3 +47,9 @@ app.*.map.json
 
 # Android native build intermediates
 /android/app/.cxx/
+/android/.kotlin/
+
+# Release signing credentials and keystores
+/android/key.properties
+*.jks
+*.keystore

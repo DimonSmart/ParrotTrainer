@@ -1,4 +1,4 @@
-package com.parrottrainer.parrot_trainer
+package com.dimonsmart.parrottrainer
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
