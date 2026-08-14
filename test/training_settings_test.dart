@@ -33,4 +33,32 @@ void main() {
     });
     expect(settings.idlePromptMinInterval, settings.idlePromptMaxInterval);
   });
+
+  test('scheduled hours include start and exclude end', () {
+    final settings = TrainingSettings.defaults.copyWith(
+      dailyScheduleEnabled: true,
+      scheduleStartMinute: 9 * 60,
+      scheduleEndMinute: 21 * 60,
+    );
+    expect(settings.isWithinScheduledHours(DateTime(2026, 1, 1, 9)), isTrue);
+    expect(
+      settings.isWithinScheduledHours(DateTime(2026, 1, 1, 20, 59)),
+      isTrue,
+    );
+    expect(settings.isWithinScheduledHours(DateTime(2026, 1, 1, 21)), isFalse);
+  });
+
+  test('scheduled hours support an interval that crosses midnight', () {
+    final settings = TrainingSettings.defaults.copyWith(
+      dailyScheduleEnabled: true,
+      scheduleStartMinute: 22 * 60,
+      scheduleEndMinute: 6 * 60,
+    );
+    expect(settings.isWithinScheduledHours(DateTime(2026, 1, 1, 23)), isTrue);
+    expect(
+      settings.isWithinScheduledHours(DateTime(2026, 1, 2, 5, 59)),
+      isTrue,
+    );
+    expect(settings.isWithinScheduledHours(DateTime(2026, 1, 2, 6)), isFalse);
+  });
 }

@@ -15,6 +15,10 @@ class TrainingSettings {
     this.focusPhraseId,
     this.primaryVoiceId,
     this.maxConsecutiveIdlePrompts = 2,
+    this.dailyScheduleEnabled = false,
+    this.scheduleStartMinute = 9 * 60,
+    this.scheduleEndMinute = 21 * 60,
+    this.allowScreenToSleep = true,
   }) : phrases = phrases.isEmpty
            ? defaults.phrases
            : List.unmodifiable(phrases),
@@ -58,7 +62,20 @@ class TrainingSettings {
   final double speechRate, speechPitch, speechVolume;
   final String? focusPhraseId, primaryVoiceId;
   final int maxConsecutiveIdlePrompts;
+  final bool dailyScheduleEnabled, allowScreenToSleep;
+  final int scheduleStartMinute, scheduleEndMinute;
   Duration get maximumInterval => idlePromptMaxInterval;
+
+  bool isWithinScheduledHours(DateTime time) {
+    if (!dailyScheduleEnabled) return true;
+    final minute = time.hour * 60 + time.minute;
+    if (scheduleStartMinute == scheduleEndMinute) return true;
+    if (scheduleStartMinute < scheduleEndMinute) {
+      return minute >= scheduleStartMinute && minute < scheduleEndMinute;
+    }
+    return minute >= scheduleStartMinute || minute < scheduleEndMinute;
+  }
+
   TrainingSettings copyWith({
     List<TrainingPhrase>? phrases,
     double? soundThresholdDb,
@@ -74,6 +91,10 @@ class TrainingSettings {
     bool clearFocusPhrase = false,
     String? primaryVoiceId,
     int? maxConsecutiveIdlePrompts,
+    bool? dailyScheduleEnabled,
+    int? scheduleStartMinute,
+    int? scheduleEndMinute,
+    bool? allowScreenToSleep,
   }) => TrainingSettings(
     phrases: phrases ?? this.phrases,
     soundThresholdDb: soundThresholdDb ?? this.soundThresholdDb,
@@ -91,6 +112,10 @@ class TrainingSettings {
     primaryVoiceId: primaryVoiceId ?? this.primaryVoiceId,
     maxConsecutiveIdlePrompts:
         maxConsecutiveIdlePrompts ?? this.maxConsecutiveIdlePrompts,
+    dailyScheduleEnabled: dailyScheduleEnabled ?? this.dailyScheduleEnabled,
+    scheduleStartMinute: scheduleStartMinute ?? this.scheduleStartMinute,
+    scheduleEndMinute: scheduleEndMinute ?? this.scheduleEndMinute,
+    allowScreenToSleep: allowScreenToSleep ?? this.allowScreenToSleep,
   );
   Map<String, Object?> toJson() => {
     'phrases': phrases.map((p) => p.toJson()).toList(),
@@ -106,6 +131,10 @@ class TrainingSettings {
     'focusPhraseId': focusPhraseId,
     'primaryVoiceId': primaryVoiceId,
     'maxConsecutiveIdlePrompts': maxConsecutiveIdlePrompts,
+    'dailyScheduleEnabled': dailyScheduleEnabled,
+    'scheduleStartMinute': scheduleStartMinute,
+    'scheduleEndMinute': scheduleEndMinute,
+    'allowScreenToSleep': allowScreenToSleep,
   };
   factory TrainingSettings.fromJson(Map<String, dynamic> json) {
     final d = defaults;
@@ -154,7 +183,21 @@ class TrainingSettings {
           ((json['maxConsecutiveIdlePrompts'] as num?)?.toInt() ??
                   d.maxConsecutiveIdlePrompts)
               .clamp(1, 100),
+      dailyScheduleEnabled:
+          json['dailyScheduleEnabled'] as bool? ?? d.dailyScheduleEnabled,
+      scheduleStartMinute: _minute(
+        json['scheduleStartMinute'],
+        d.scheduleStartMinute,
+      ),
+      scheduleEndMinute: _minute(
+        json['scheduleEndMinute'],
+        d.scheduleEndMinute,
+      ),
+      allowScreenToSleep:
+          json['allowScreenToSleep'] as bool? ?? d.allowScreenToSleep,
     );
   }
+  static int _minute(Object? value, int fallback) =>
+      (value as num?)?.toInt().clamp(0, 1439) ?? fallback;
   static String _legacyId(String text) => 'legacy-${text.hashCode.abs()}';
 }

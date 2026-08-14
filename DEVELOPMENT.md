@@ -10,7 +10,7 @@ Parrot Trainer is a Flutter application for Android.
 - multiple installed Android TTS voices can be selected;
 - training phrases and speech settings are editable;
 - settings and lifetime statistics are stored locally;
-- training stops safely when the app moves to the background.
+- training can continue safely in the background with the screen off when the owner enables that option; otherwise it stops when the app moves to the background.
 
 ## Build and test
 

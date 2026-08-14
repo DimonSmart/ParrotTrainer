@@ -44,6 +44,8 @@ class AppController extends ChangeNotifier {
   final List<double> _calibrationSamples = [];
   DateTime? _calibrationStartedAt;
   bool _microphoneCaptureSuspended = false;
+  Timer? _scheduleTimer;
+  Timer? _scheduleEndTimer;
 
   Future<void> initialize() async {
     settings = await _settingsRepository.load();
@@ -88,6 +90,10 @@ class AppController extends ChangeNotifier {
       voices = [];
     }
     initialized = true;
+    _scheduleTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_enforceSchedule()),
+    );
     notifyListeners();
   }
 
@@ -100,10 +106,20 @@ class AppController extends ChangeNotifier {
     settings = value;
     session.updateSettings(value);
     await _settingsRepository.save(value);
+    if (session.isRunning && !settings.isWithinScheduledHours(DateTime.now())) {
+      await stopTraining();
+    } else {
+      await _syncPowerMode();
+      _scheduleStopAtEnd();
+    }
     notifyListeners();
   }
 
   Future<bool> startTraining() async {
+    if (!settings.isWithinScheduledHours(DateTime.now())) {
+      notifyListeners();
+      return false;
+    }
     if (!microphoneAvailable) {
       try {
         microphoneAvailable = await _audio.start();
@@ -115,8 +131,9 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    await _keepScreenOn.setEnabled(true);
     session.start();
+    await _syncPowerMode();
+    _scheduleStopAtEnd();
     return true;
   }
 
@@ -124,11 +141,14 @@ class AppController extends ChangeNotifier {
     try {
       await session.stop();
     } finally {
-      await _keepScreenOn.setEnabled(false);
+      _scheduleEndTimer?.cancel();
+      _scheduleEndTimer = null;
+      await _syncPowerMode();
     }
   }
 
   Future<void> pauseForBackground() async {
+    if (session.isRunning && settings.allowScreenToSleep) return;
     await stopTraining();
     await _audio.stop();
   }
@@ -156,6 +176,42 @@ class AppController extends ChangeNotifier {
       microphoneAvailable = false;
     }
     notifyListeners();
+  }
+
+  Future<void> _enforceSchedule() async {
+    if (session.isRunning && !settings.isWithinScheduledHours(DateTime.now())) {
+      await stopTraining();
+    }
+  }
+
+  void _scheduleStopAtEnd() {
+    _scheduleEndTimer?.cancel();
+    if (!session.isRunning ||
+        !settings.dailyScheduleEnabled ||
+        settings.scheduleStartMinute == settings.scheduleEndMinute) {
+      return;
+    }
+    final now = DateTime.now();
+    var end = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      settings.scheduleEndMinute ~/ 60,
+      settings.scheduleEndMinute % 60,
+    );
+    if (!end.isAfter(now)) end = end.add(const Duration(days: 1));
+    _scheduleEndTimer = Timer(
+      end.difference(now),
+      () => unawaited(stopTraining()),
+    );
+  }
+
+  Future<void> _syncPowerMode() async {
+    final running = session.isRunning;
+    await _keepScreenOn.setEnabled(running && !settings.allowScreenToSleep);
+    await _keepScreenOn.setBackgroundTrainingEnabled(
+      running && settings.allowScreenToSleep,
+    );
   }
 
   Future<void> resetSettings() async {
@@ -203,8 +259,11 @@ class AppController extends ChangeNotifier {
   void dispose() {
     session.removeListener(_sessionChanged);
     session.dispose();
+    _scheduleTimer?.cancel();
+    _scheduleEndTimer?.cancel();
     _levelSubscription?.cancel();
     unawaited(_keepScreenOn.setEnabled(false));
+    unawaited(_keepScreenOn.setBackgroundTrainingEnabled(false));
     unawaited(_audio.dispose());
     super.dispose();
   }

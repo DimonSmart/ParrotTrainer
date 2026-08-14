@@ -18,6 +18,14 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "parrot_trainer/screen")
             .setMethodCallHandler { call, result ->
                 if (call.method != "setKeepScreenOn") {
+                    if (call.method == "setBackgroundTrainingEnabled") {
+                        TrainingBackgroundService.setEnabled(
+                            this,
+                            call.argument<Boolean>("enabled") == true,
+                        )
+                        result.success(null)
+                        return@setMethodCallHandler
+                    }
                     result.notImplemented()
                     return@setMethodCallHandler
                 }

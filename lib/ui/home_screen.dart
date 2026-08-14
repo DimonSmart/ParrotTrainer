@@ -74,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _PhrasesCard(controller: controller),
                   _MicrophoneCard(controller: controller),
                   _IntervalsCard(controller: controller),
+                  _ScheduleCard(controller: controller),
                   _VoicesCard(controller: controller),
                   _StatisticsCard(controller: controller),
                   const SizedBox(height: 10),
@@ -105,6 +106,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _toggleTraining(bool enabled) async {
     if (!enabled) {
       await controller.stopTraining();
+      return;
+    }
+    if (!controller.settings.isWithinScheduledHours(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Сейчас вне установленного времени обучения.'),
+        ),
+      );
       return;
     }
     final started = await controller.startTraining();
@@ -506,6 +515,83 @@ class _IntervalsCard extends StatelessWidget {
   }
 }
 
+class _ScheduleCard extends StatelessWidget {
+  const _ScheduleCard({required this.controller});
+
+  final AppController controller;
+
+  Future<void> _pickTime(BuildContext context, bool start) async {
+    final settings = controller.settings;
+    final minute = start
+        ? settings.scheduleStartMinute
+        : settings.scheduleEndMinute;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
+    );
+    if (selected == null) return;
+    final value = selected.hour * 60 + selected.minute;
+    await controller.updateSettings(
+      settings.copyWith(
+        scheduleStartMinute: start ? value : null,
+        scheduleEndMinute: start ? null : value,
+      ),
+    );
+  }
+
+  String _format(BuildContext context, int minute) =>
+      MaterialLocalizations.of(context).formatTimeOfDay(
+        TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
+        alwaysUse24HourFormat: true,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = controller.settings;
+    return _SectionCard(
+      title: 'Время работы',
+      child: Column(
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Работать по расписанию'),
+            subtitle: const Text('Вне этого времени тренировка выключается'),
+            value: settings.dailyScheduleEnabled,
+            onChanged: (value) => controller.updateSettings(
+              settings.copyWith(dailyScheduleEnabled: value),
+            ),
+          ),
+          if (settings.dailyScheduleEnabled) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Начало'),
+              trailing: Text(_format(context, settings.scheduleStartMinute)),
+              onTap: () => _pickTime(context, true),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Окончание'),
+              trailing: Text(_format(context, settings.scheduleEndMinute)),
+              onTap: () => _pickTime(context, false),
+            ),
+          ],
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Разрешить выключение экрана'),
+            subtitle: const Text(
+              'Тренировка продолжится с уведомлением в строке состояния',
+            ),
+            value: settings.allowScreenToSleep,
+            onChanged: (value) => controller.updateSettings(
+              settings.copyWith(allowScreenToSleep: value),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DurationSlider extends StatelessWidget {
   const _DurationSlider({
     required this.label,
@@ -838,71 +924,69 @@ class _AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     return Drawer(
-    child: SafeArea(
-      child: ListView(
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFFE8F5D8)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text('🦜', style: TextStyle(fontSize: 46)),
-                Text(
-                  'Parrot Trainer',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: Text(strings.about),
-            onTap: () async {
-              Navigator.pop(context);
-              final info = await PackageInfo.fromPlatform();
-              if (!context.mounted) return;
-              showAboutDialog(
-                context: context,
-                applicationName: strings.appTitle,
-                applicationVersion: info.version,
+      child: SafeArea(
+        child: ListView(
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Color(0xFFE8F5D8)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  Text('🦜', style: TextStyle(fontSize: 46)),
                   Text(
-                    strings.aboutDescription,
+                    'Parrot Trainer',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
                   ),
                 ],
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: Text(strings.privacyPolicy),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings_backup_restore),
-            title: Text(strings.resetSettings),
-            onTap: () async {
-              Navigator.pop(context);
-              await controller.resetSettings();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: Text(strings.resetStatistics),
-            onTap: () async {
-              Navigator.pop(context);
-              await controller.resetStatistics();
-            },
-          ),
-        ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: Text(strings.about),
+              onTap: () async {
+                Navigator.pop(context);
+                final info = await PackageInfo.fromPlatform();
+                if (!context.mounted) return;
+                showAboutDialog(
+                  context: context,
+                  applicationName: strings.appTitle,
+                  applicationVersion: info.version,
+                  children: [Text(strings.aboutDescription)],
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(strings.privacyPolicy),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_backup_restore),
+              title: Text(strings.resetSettings),
+              onTap: () async {
+                Navigator.pop(context);
+                await controller.resetSettings();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(strings.resetStatistics),
+              onTap: () async {
+                Navigator.pop(context);
+                await controller.resetStatistics();
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 }
