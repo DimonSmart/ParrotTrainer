@@ -22,6 +22,7 @@ class AudioLevelService {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        audioInterruption: AudioInterruptionMode.none,
       ),
     );
     _audioSubscription = stream.listen((_) {});

@@ -239,6 +239,28 @@ void main() {
     );
 
     test(
+      'microphone capture is paused for speech and resumed after its guard',
+      () async {
+        final capture = FakeCaptureCoordinator();
+        final fixture = Fixture(capture: capture);
+        fixture.controller.start();
+        fixture.clock.advance(const Duration(seconds: 30));
+        fixture.controller.tick();
+        await flushAsync();
+        await flushAsync();
+
+        expect(capture.pauses, 1);
+        expect(capture.resumes, 0);
+
+        fixture.clock.advance(TrainingSessionController.postSpeechGuard);
+        fixture.controller.tick();
+        await flushAsync();
+
+        expect(capture.resumes, 1);
+      },
+    );
+
+    test(
       'idle prompts stop after unanswered limit and bird breaks quiet period',
       () async {
         final fixture = Fixture();
@@ -273,6 +295,7 @@ class Fixture {
   Fixture({
     FakeTts? tts,
     RecordedPhrasePlayer? recordedPlayer,
+    FakeCaptureCoordinator? capture,
     List<TrainingPhrase>? phrases,
   }) : tts = tts ?? FakeTts() {
     controller = TrainingSessionController(
@@ -287,6 +310,7 @@ class Fixture {
       sessionClock: clock,
       randomSource: FixedRandom(),
       recordedPhrasePlayer: recordedPlayer,
+      microphoneCapture: capture,
       enableAutomaticTicks: false,
     );
   }
@@ -310,6 +334,16 @@ class FakeRecordedPlayer implements RecordedPhrasePlayer {
   Future<void> stop() async {}
   @override
   Future<void> dispose() async {}
+}
+
+class FakeCaptureCoordinator implements MicrophoneCaptureCoordinator {
+  int pauses = 0;
+  int resumes = 0;
+
+  @override
+  Future<void> pause() async => pauses++;
+  @override
+  Future<void> resume() async => resumes++;
 }
 
 class FakeClock implements Clock {

@@ -21,6 +21,11 @@ enum TrainingState {
 
 enum SpeechReason { responseToSound, idle }
 
+abstract interface class MicrophoneCaptureCoordinator {
+  Future<void> pause();
+  Future<void> resume();
+}
+
 class TrainingSessionController extends ChangeNotifier {
   TrainingSessionController({
     required TrainingSettings initialSettings,
@@ -30,6 +35,7 @@ class TrainingSessionController extends ChangeNotifier {
     required Clock sessionClock,
     required RandomSource randomSource,
     RecordedPhrasePlayer? recordedPhrasePlayer,
+    this.microphoneCapture,
     this.onStatisticsChanged,
     bool enableAutomaticTicks = true,
   }) : _settings = initialSettings,
@@ -40,7 +46,7 @@ class TrainingSessionController extends ChangeNotifier {
        _random = randomSource,
        _recordedPlayer = recordedPhrasePlayer ?? LocalRecordedPhrasePlayer(),
        _autoTick = enableAutomaticTicks;
-  static const postSpeechGuard = Duration(milliseconds: 500),
+  static const postSpeechGuard = Duration(seconds: 2),
       birdReplyWindow = Duration(seconds: 10),
       quietPeriodDuration = Duration(minutes: 5),
       maxDeferredReplyDelay = Duration(seconds: 2);
@@ -52,6 +58,7 @@ class TrainingSessionController extends ChangeNotifier {
   final Clock _clock;
   final RandomSource _random;
   final bool _autoTick;
+  final MicrophoneCaptureCoordinator? microphoneCapture;
   final Future<void> Function(TrainingStatistics)? onStatisticsChanged;
   Timer? _timer;
   DateTime? _cycleStartedAt,
@@ -219,6 +226,7 @@ class TrainingSessionController extends ChangeNotifier {
       if (_guardEndsAt != null && !now.isBefore(_guardEndsAt!)) {
         _replyWindowEndsAt = now.add(birdReplyWindow);
         _resetCycle(now, preserveReplyWindow: true);
+        unawaited(microphoneCapture?.resume());
       }
       return;
     }
@@ -293,6 +301,7 @@ class TrainingSessionController extends ChangeNotifier {
         : (primary.isEmpty ? null : primary.first);
     _previousVoiceId = voice?.id;
     try {
+      await microphoneCapture?.pause();
       final played = await _recordedPlayer.playIfAvailable(
         phrase.recordedAudioPath,
       );

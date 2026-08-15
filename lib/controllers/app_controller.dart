@@ -65,6 +65,10 @@ class AppController extends ChangeNotifier {
         await _statisticsRepository.save(value);
         notifyListeners();
       },
+      microphoneCapture: _AppMicrophoneCaptureCoordinator(
+        onPause: _suspendAudioCaptureForSpeech,
+        onResume: _resumeAudioCaptureAfterSpeech,
+      ),
     );
     session.addListener(_sessionChanged);
     _levelSubscription = _audio.levels.listen((level) {
@@ -178,6 +182,13 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _suspendAudioCaptureForSpeech() => _audio.stop();
+
+  Future<void> _resumeAudioCaptureAfterSpeech() async {
+    if (_microphoneCaptureSuspended || !session.isRunning) return;
+    await _startAudioCapture();
+  }
+
   Future<void> _enforceSchedule() async {
     if (session.isRunning && !settings.isWithinScheduledHours(DateTime.now())) {
       await stopTraining();
@@ -272,4 +283,20 @@ class AppController extends ChangeNotifier {
     unawaited(_audio.dispose());
     super.dispose();
   }
+}
+
+class _AppMicrophoneCaptureCoordinator implements MicrophoneCaptureCoordinator {
+  const _AppMicrophoneCaptureCoordinator({
+    required this.onPause,
+    required this.onResume,
+  });
+
+  final Future<void> Function() onPause;
+  final Future<void> Function() onResume;
+
+  @override
+  Future<void> pause() => onPause();
+
+  @override
+  Future<void> resume() => onResume();
 }
