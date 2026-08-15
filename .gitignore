@@ -49,6 +49,15 @@ app.*.map.json
 /android/app/.cxx/
 /android/.kotlin/
 
+# Vendored plugins supply the application source. Their examples, tests and
+# release-maintenance files are not part of this application.
+/third_party/*/example/
+/third_party/*/test/
+/third_party/*/gen/
+/third_party/*/analysis_options.yaml
+/third_party/*/distribution.sh
+/third_party/*/tag.sh
+
 # Release signing credentials and keystores
 /android/key.properties
 *.jks

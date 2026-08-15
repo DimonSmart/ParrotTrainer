@@ -1,0 +1,28 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="vn.fighttechvn.stt_record">
+
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!-- Required for SpeechRecognizer discovery on Android 11+ (API 30+) -->
+  <queries>
+    <intent>
+      <action android:name="android.speech.RecognitionService" />
+    </intent>
+  </queries>
+
+  <application>
+    <!-- Used for audio injection via RecognizerIntent.EXTRA_AUDIO_INJECT_SOURCE (API 31-32) -->
+    <provider
+      android:name="vn.fighttechvn.stt_record.SttRecordAudioPipeProvider"
+      android:authorities="${applicationId}.stt_record_audio_pipe"
+      android:exported="false"
+      android:grantUriPermissions="true" />
+
+    <service
+      android:name="vn.fighttechvn.stt_record.SttRecordForegroundService"
+      android:exported="false"
+      android:foregroundServiceType="microphone" />
+  </application>
+</manifest>

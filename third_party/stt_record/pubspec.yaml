@@ -1,0 +1,28 @@
+name: stt_record
+description: "Record audio to WAV while streaming speech-to-text transcripts in realtime (iOS/Android)."
+version: 0.0.8
+homepage: https://pub.dev/packages/stt_record
+keyword: "record audio, dictation, text transcript"
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: vn.fighttechvn.stt_record
+        pluginClass: SttRecordPlugin
+      ios:
+        pluginClass: SttRecordPlugin
