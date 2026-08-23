@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -16,3 +19,9 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter build appbundle --release
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: parrot-trainer-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

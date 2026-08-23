@@ -15,6 +15,7 @@ Parrot Trainer is a Flutter application for Android.
 ## Build and test
 
 ```shell
+flutter clean
 flutter pub get
 flutter test
 flutter analyze
@@ -29,13 +30,27 @@ build/app/outputs/bundle/release/app-release.aab
 
 ## Android release signing
 
-Create a separate upload key (never commit it):
+Create a separate upload key once (never commit it):
 
 ```shell
 keytool -genkeypair -v -keystore android/parrot-trainer-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-Create `android/key.properties` locally:
+Copy the committed template and replace the placeholder passwords:
+
+### PowerShell
+
+```powershell
+Copy-Item android/key.properties.example android/key.properties
+```
+
+### macOS / Linux
+
+```shell
+cp android/key.properties.example android/key.properties
+```
+
+The resulting local file should contain:
 
 ```properties
 storePassword=your-keystore-password
@@ -44,6 +59,23 @@ keyAlias=upload
 storeFile=parrot-trainer-upload.jks
 ```
 
-Then run `flutter build appbundle --release`. `key.properties`, `.jks`, and
-`.keystore` files are ignored by Git. Without `key.properties` Gradle produces
-an unsigned, release-compatible bundle for CI checks.
+`storeFile` is resolved relative to the `android` project directory, so the
+configuration above points to `android/parrot-trainer-upload.jks`.
+
+Then run:
+
+```shell
+flutter build appbundle --release
+```
+
+`android/key.properties`, `.jks`, and `.keystore` files are ignored by Git.
+Without `key.properties`, Gradle can build an unsigned release-compatible bundle
+for CI verification, but that bundle cannot be uploaded as a production release
+to Google Play.
+
+Keep a secure backup of the upload keystore and its passwords outside the
+repository. Do not ask an automated coding agent to commit, print, or upload
+those secrets.
+
+See [docs/google-play-release.md](docs/google-play-release.md) for the complete
+Google Play release checklist.
