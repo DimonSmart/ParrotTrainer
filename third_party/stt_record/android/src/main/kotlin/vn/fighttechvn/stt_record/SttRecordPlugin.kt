@@ -25,6 +25,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.system.Os
 import android.system.OsConstants
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -1120,7 +1121,9 @@ class SttRecordPlugin :
         }
 
         @Suppress("DEPRECATION")
-        runCatching { am.abandonAudioFocus(listener) }
+        runCatching {
+            am.abandonAudioFocus(listener)
+        }
     }
 
     private fun pause(result: Result) {
@@ -1312,6 +1315,7 @@ class SttRecordPlugin :
             }
 
             override fun onError(error: Int) {
+                Log.e("SttRecord", "onError: $error")
                 cancelSegmentRotate()
                 // Best-effort: finalize any outstanding partial before we restart.
                 handleRecognitionSegment(null, isFinal = true)
@@ -1380,6 +1384,7 @@ class SttRecordPlugin :
             override fun onResults(results: android.os.Bundle) {
                 cancelSegmentRotate()
                 val texts = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                Log.d("SttRecord", "onResults: $texts")
                 val segment = texts?.firstOrNull()
                 handleRecognitionSegment(segment, isFinal = true)
 
@@ -1397,6 +1402,7 @@ class SttRecordPlugin :
 
             override fun onPartialResults(partialResults: android.os.Bundle) {
                 val texts = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                Log.d("SttRecord", "onPartialResults: $texts")
                 val segment = texts?.firstOrNull() ?: return
 
                 synchronized(lock) {
