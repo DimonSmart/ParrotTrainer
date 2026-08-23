@@ -122,10 +122,14 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
     final phraseId = _phraseId;
     if (phraseId == null) throw StateError('Recognition is not running');
     String sourcePath;
+    String? recognizedText;
+    Object? recognitionError;
     var stopped = false;
     try {
       sourcePath = await _session.stop();
       stopped = true;
+      recognizedText = _latestText.isEmpty ? null : _latestText;
+      recognitionError = _recognitionError;
     } finally {
       await _cleanupSession(cancelNative: !stopped);
     }
@@ -168,8 +172,8 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
     }
     return SpeechRecognitionResult(
       audioPath: persisted.path,
-      text: _latestText.isEmpty ? null : _latestText,
-      error: _recognitionError ?? conversionError,
+      text: recognizedText,
+      error: recognitionError ?? conversionError,
     );
   }
 
