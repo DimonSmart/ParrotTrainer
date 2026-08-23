@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:stt_record/stt_record.dart';
@@ -97,10 +98,19 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
     _latestText = '';
     _recognitionError = null;
     await _transcriptSubscription?.cancel();
-    _transcriptSubscription = _session.transcripts.listen((result) {
-      final text = result.text.trim();
-      if (text.isNotEmpty) _latestText = text;
-    }, onError: (Object error) => _recognitionError = error);
+    _transcriptSubscription = _session.transcripts.listen(
+      (result) {
+        final text = result.text.trim();
+        debugPrint(
+          'STT Dart transcript: final=${result.isFinal}, text="$text"',
+        );
+        if (text.isNotEmpty) _latestText = text;
+      },
+      onError: (Object error) {
+        debugPrint('STT Dart error: $error');
+        _recognitionError = error;
+      },
+    );
     try {
       await _session.start(
         localeId: PlatformDispatcher.instance.locale.toLanguageTag(),
@@ -130,6 +140,9 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
       stopped = true;
       recognizedText = _latestText.isEmpty ? null : _latestText;
       recognitionError = _recognitionError;
+      debugPrint(
+        'STT stop snapshot: text="${recognizedText ?? ''}", error=$recognitionError',
+      );
     } finally {
       await _cleanupSession(cancelNative: !stopped);
     }
@@ -151,7 +164,6 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
     final m4aDestination = File(
       '${recordings.path}${Platform.pathSeparator}$phraseId.m4a',
     );
-    Object? conversionError;
     File persisted;
     if (Platform.isAndroid) {
       try {
@@ -162,7 +174,8 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
         });
         persisted = m4aDestination;
       } catch (error) {
-        conversionError = error;
+        debugPrint('Audio conversion failed, using WAV: $error');
+        if (await m4aDestination.exists()) await m4aDestination.delete();
         if (await wavDestination.exists()) await wavDestination.delete();
         persisted = await File(sourcePath).copy(wavDestination.path);
       }
@@ -170,10 +183,14 @@ class SystemSpeechRecognitionService implements SpeechRecognitionService {
       if (await wavDestination.exists()) await wavDestination.delete();
       persisted = await File(sourcePath).copy(wavDestination.path);
     }
+    debugPrint(
+      'STT result: text="${recognizedText ?? ''}", audioPath=${persisted.path}, '
+      'error=$recognitionError',
+    );
     return SpeechRecognitionResult(
       audioPath: persisted.path,
       text: recognizedText,
-      error: recognitionError ?? conversionError,
+      error: recognitionError,
     );
   }
 

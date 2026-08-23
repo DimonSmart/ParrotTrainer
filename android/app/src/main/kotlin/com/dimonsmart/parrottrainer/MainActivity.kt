@@ -54,9 +54,16 @@ class MainActivity : FlutterActivity() {
                     return@setMethodCallHandler
                 }
                 Thread {
-                    runCatching { convertWavToM4a(sourcePath, destinationPath) }
+                    runCatching {
+                        convertWavToM4a(sourcePath, destinationPath)
+                        val destination = File(destinationPath)
+                        check(destination.isFile && destination.length() > 0L) {
+                            "M4A conversion produced an empty file"
+                        }
+                    }
                         .onSuccess { runOnUiThread { result.success(null) } }
                         .onFailure { error ->
+                            File(destinationPath).delete()
                             runOnUiThread {
                                 result.error("audio_conversion_failed", error.message, null)
                             }
