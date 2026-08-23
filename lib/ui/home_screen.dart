@@ -9,6 +9,7 @@ import '../services/sound_detector.dart';
 import 'phrase_editor_screen.dart';
 import 'voices_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'activity_history_screen.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -708,6 +709,12 @@ class _StatisticsCard extends StatelessWidget {
     final stats = controller.statistics;
     return _SectionCard(
       title: 'Статистика',
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ActivityHistoryScreen(controller: controller),
+        ),
+      ),
       child: Row(
         children: [
           Expanded(

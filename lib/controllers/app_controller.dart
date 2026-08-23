@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/training_settings.dart';
 import '../models/training_statistics.dart';
+import '../models/activity_history.dart';
+import '../services/activity_history_repository.dart';
+import '../services/activity_history_tracker.dart';
 import '../services/audio_level_service.dart';
 import '../services/calibration.dart';
 import '../services/keep_screen_on_service.dart';
@@ -17,17 +20,21 @@ class AppController extends ChangeNotifier {
   AppController({
     SettingsRepository? settingsRepository,
     StatisticsRepository? statisticsRepository,
+    ActivityHistoryRepository? activityHistoryRepository,
     AudioLevelService? audio,
     TtsService? tts,
     KeepScreenOnService? keepScreenOn,
   }) : _settingsRepository = settingsRepository ?? SettingsRepository(),
        _statisticsRepository = statisticsRepository ?? StatisticsRepository(),
+       _activityHistoryRepository =
+           activityHistoryRepository ?? ActivityHistoryRepository(),
        _audio = audio ?? AudioLevelService(),
        tts = tts ?? AndroidTtsService(),
        _keepScreenOn = keepScreenOn ?? AndroidKeepScreenOnService();
 
   final SettingsRepository _settingsRepository;
   final StatisticsRepository _statisticsRepository;
+  final ActivityHistoryRepository _activityHistoryRepository;
   final AudioLevelService _audio;
   final KeepScreenOnService _keepScreenOn;
   final TtsService tts;
@@ -46,10 +53,18 @@ class AppController extends ChangeNotifier {
   bool _microphoneCaptureSuspended = false;
   Timer? _scheduleTimer;
   Timer? _scheduleEndTimer;
+  Timer? _activityCheckpointTimer;
+  late final ActivityHistoryTracker _activityHistory;
+  TrainingStatistics? _lastRecordedStatistics;
 
   Future<void> initialize() async {
     settings = await _settingsRepository.load();
     statistics = await _statisticsRepository.load();
+    _lastRecordedStatistics = statistics;
+    _activityHistory = ActivityHistoryTracker(
+      _activityHistoryRepository,
+      onChanged: notifyListeners,
+    );
     final detector = ThresholdSoundDetector(
       initialThresholdDb: settings.soundThresholdDb,
     );
@@ -61,7 +76,12 @@ class AppController extends ChangeNotifier {
       sessionClock: SystemClock(),
       randomSource: DartRandomSource(),
       onStatisticsChanged: (value) async {
+        final before = _lastRecordedStatistics ?? value;
+        final now = DateTime.now();
         statistics = value;
+        _lastRecordedStatistics = value;
+        await _activityHistory.checkpoint(now);
+        await _activityHistory.recordDelta(before, value, now);
         await _statisticsRepository.save(value);
         notifyListeners();
       },
@@ -135,7 +155,16 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final now = DateTime.now();
+    _activityHistory.start(now);
     session.start();
+    _activityCheckpointTimer ??= Timer.periodic(const Duration(seconds: 45), (
+      _,
+    ) {
+      if (session.isRunning) {
+        unawaited(_activityHistory.checkpoint(DateTime.now()));
+      }
+    });
     await _syncPowerMode();
     _scheduleStopAtEnd();
     return true;
@@ -143,8 +172,13 @@ class AppController extends ChangeNotifier {
 
   Future<void> stopTraining() async {
     try {
+      if (session.isRunning) {
+        await _activityHistory.stop(DateTime.now());
+      }
       await session.stop();
     } finally {
+      _activityCheckpointTimer?.cancel();
+      _activityCheckpointTimer = null;
       _scheduleEndTimer?.cancel();
       _scheduleEndTimer = null;
       await _syncPowerMode();
@@ -232,9 +266,14 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> resetStatistics() async {
+    final now = DateTime.now();
+    await _activityHistory.stop(now);
     statistics = const TrainingStatistics();
     session.updateStatistics(statistics);
     await _statisticsRepository.reset();
+    await _activityHistoryRepository.reset();
+    _lastRecordedStatistics = statistics;
+    if (session.isRunning) _activityHistory.start(now);
     notifyListeners();
   }
 
@@ -261,6 +300,12 @@ class AppController extends ChangeNotifier {
 
   void markGoodAttempt() => session.markGoodAttempt();
 
+  Future<DailyActivity?> loadActivityDay(DateTime date) =>
+      _activityHistoryRepository.loadDay(date);
+
+  Future<List<DailyActivity>> loadActivityMonth(int year, int month) =>
+      _activityHistoryRepository.loadMonth(year, month);
+
   Future<void> previewVoice(TtsVoice voice) async {
     await session.stop();
     await tts.speak('Привет, моя птичка', settings, voice);
@@ -277,6 +322,7 @@ class AppController extends ChangeNotifier {
     session.dispose();
     _scheduleTimer?.cancel();
     _scheduleEndTimer?.cancel();
+    _activityCheckpointTimer?.cancel();
     _levelSubscription?.cancel();
     unawaited(_keepScreenOn.setEnabled(false));
     unawaited(_keepScreenOn.setBackgroundTrainingEnabled(false));
