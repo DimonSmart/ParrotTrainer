@@ -321,25 +321,32 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         );
       },
     ),
-    floatingActionButton: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton.extended(
-          key: const Key('addTextPhrase'),
-          heroTag: 'addTextPhrase',
-          onPressed: _recordingId == null ? _addTextPhrase : null,
-          icon: const Icon(Icons.add),
-          label: const Text('Текст'),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('addTextPhrase'),
+                onPressed: _recordingId == null ? _addTextPhrase : null,
+                icon: const Icon(Icons.add),
+                label: const Text('Текст'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('addVoicePhrase'),
+                onPressed: _recordingId == null ? _addVoicePhrase : null,
+                icon: const Icon(Icons.mic),
+                label: const Text('Голос'),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        FloatingActionButton.extended(
-          key: const Key('addVoicePhrase'),
-          heroTag: 'addVoicePhrase',
-          onPressed: _recordingId == null ? _addVoicePhrase : null,
-          icon: const Icon(Icons.mic),
-          label: const Text('Голос'),
-        ),
-      ],
+      ),
     ),
   );
 
