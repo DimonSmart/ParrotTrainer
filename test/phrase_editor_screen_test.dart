@@ -22,7 +22,7 @@ void main() {
     expect(fixture.recorder.startedIds, isEmpty);
   });
 
-  testWidgets('voice action creates a phrase and starts recording', (
+  testWidgets('voice action starts recording without creating a phrase', (
     tester,
   ) async {
     final fixture = await _pumpEditor(tester, const [original]);
@@ -30,9 +30,23 @@ void main() {
     await tester.tap(find.byKey(const Key('addVoicePhrase')));
     await tester.pump();
 
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(TextField), findsOneWidget);
     expect(fixture.speech.startCalls, 1);
-    expect(find.text('Остановить'), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Стоп'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('stopping the voice action creates the recorded phrase', (
+    tester,
+  ) async {
+    await _pumpEditor(tester, const [original]);
+
+    await recordNewVoicePhrase(tester);
+
+    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.widgetWithText(FilledButton, 'Голос'), findsOneWidget);
   });
 
   testWidgets('successful recognition fills empty text', (tester) async {
@@ -132,15 +146,28 @@ void main() {
 
     await tester.tap(find.byKey(const Key('addVoicePhrase')));
     await tester.pump();
+    expect(find.byType(TextField), findsOneWidget);
     expect(fixture.recorder.startedIds, hasLength(1));
     expect(fixture.events, ['speech.start', 'speech.cancel', 'recorder.start']);
-    await tester.tap(find.text('Остановить'));
+    await tester.tap(find.byKey(const Key('addVoicePhrase')));
     await tester.pump();
     await tester.enterText(find.byType(TextField).last, 'Вручную');
     await tester.pump();
 
     expect(lastText(tester), 'Вручную');
     expect(find.text('Не удалось начать запись'), findsNothing);
+  });
+
+  testWidgets('failed new voice recording does not create an empty phrase', (
+    tester,
+  ) async {
+    final fixture = await _pumpEditor(tester, const [original]);
+    fixture.speech.stopError = const EmptyAudioRecordingException();
+
+    await recordNewVoicePhrase(tester);
+
+    expect(find.text('Не удалось записать звук'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
   });
 
   testWidgets('empty coordinated audio switches later recordings to fallback', (
@@ -188,7 +215,8 @@ void main() {
     await tester.pump();
 
     expect(fixture.speech.cancelCalls, 1);
-    expect(find.text('Остановить'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Стоп'), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
   });
 }
 
@@ -213,7 +241,7 @@ Future<_EditorFixture> _pumpEditor(
 Future<void> recordNewVoicePhrase(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('addVoicePhrase')));
   await tester.pump();
-  await tester.tap(find.text('Остановить'));
+  await tester.tap(find.byKey(const Key('addVoicePhrase')));
   await tester.pump();
 }
 

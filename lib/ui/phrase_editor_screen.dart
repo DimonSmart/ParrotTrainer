@@ -33,7 +33,9 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
   late final List<TrainingPhrase> _phrases = List.of(widget.phrases);
   final Map<String, TextEditingController> _textControllers = {};
   final Set<String> _emptyRecordedPhraseIds = {};
+  final ScrollController _scrollController = ScrollController();
   String? _recordingId;
+  String? _newVoiceRecordingId;
   bool _recognitionActive = false;
   bool _coordinatedRecordingUnavailable = false;
 
@@ -71,6 +73,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
       if (mounted) {
         setState(() {
           _recordingId = null;
+          _newVoiceRecordingId = null;
           _recognitionActive = false;
         });
       }
@@ -87,10 +90,30 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
     }
     if (_recordingId != null) return;
 
+    await _startRecording(phrase.id);
+  }
+
+  Future<void> _toggleNewVoiceRecording() async {
+    final pendingId = _newVoiceRecordingId;
+    if (pendingId != null && _recordingId == pendingId) {
+      await _stopRecording(pendingId, createPhrase: true);
+      return;
+    }
+    if (_recordingId != null) return;
+
+    await _startRecording(TrainingPhrase.newId(), isNewVoice: true);
+  }
+
+  Future<void> _startRecording(
+    String phraseId, {
+    bool isNewVoice = false,
+  }) async {
+    if (_recordingId != null) return;
+
     try {
       if (!_coordinatedRecordingUnavailable) {
         try {
-          await _speechRecognition.start(phrase.id);
+          await _speechRecognition.start(phraseId);
           _recognitionActive = true;
         } catch (_) {
           await _speechRecognition.cancel();
@@ -98,7 +121,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         }
       }
       if (!_recognitionActive) {
-        await _recorder.start(phrase.id);
+        await _recorder.start(phraseId);
         if (mounted && _coordinatedRecordingUnavailable) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -109,7 +132,12 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
           );
         }
       }
-      if (mounted) setState(() => _recordingId = phrase.id);
+      if (mounted) {
+        setState(() {
+          _recordingId = phraseId;
+          _newVoiceRecordingId = isNewVoice ? phraseId : null;
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -118,7 +146,10 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
     }
   }
 
-  Future<void> _stopRecording(String phraseId) async {
+  Future<void> _stopRecording(
+    String phraseId, {
+    bool createPhrase = false,
+  }) async {
     try {
       String? audioPath;
       String? recognizedText;
@@ -132,19 +163,34 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         audioPath = await _recorder.stop();
       }
 
-      final phrase = _current(phraseId);
-      final shouldFillText =
-          phrase.text.trim().isEmpty &&
-          recognizedText != null &&
-          recognizedText.isNotEmpty;
-      final updated = phrase.copyWith(
-        recordedAudioPath: audioPath,
-        text: shouldFillText ? recognizedText : null,
-      );
-      if (shouldFillText) {
-        _textControllers[phraseId]!.text = recognizedText;
+      if (createPhrase) {
+        if (audioPath == null) throw const EmptyAudioRecordingException();
+        final text = recognizedText ?? '';
+        final phrase = TrainingPhrase(
+          id: phraseId,
+          text: text,
+          recordedAudioPath: audioPath,
+        );
+        _textControllers[phraseId] = TextEditingController(text: text);
+        if (mounted) {
+          setState(() => _phrases.add(phrase));
+          _scrollToBottom();
+        }
+      } else {
+        final phrase = _current(phraseId);
+        final shouldFillText =
+            phrase.text.trim().isEmpty &&
+            recognizedText != null &&
+            recognizedText.isNotEmpty;
+        final updated = phrase.copyWith(
+          recordedAudioPath: audioPath,
+          text: shouldFillText ? recognizedText : null,
+        );
+        if (shouldFillText) {
+          _textControllers[phraseId]!.text = recognizedText;
+        }
+        _replace(updated);
       }
-      _replace(updated);
       if (recognitionError != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -169,10 +215,18 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
       if (mounted) {
         setState(() {
           _recordingId = null;
+          _newVoiceRecordingId = null;
           _recognitionActive = false;
         });
       }
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
   }
 
   void _replace(TrainingPhrase phrase) {
@@ -184,13 +238,6 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
     final phrase = TrainingPhrase(id: TrainingPhrase.newId(), text: '');
     _textControllers[phrase.id] = TextEditingController();
     setState(() => _phrases.add(phrase));
-  }
-
-  Future<void> _addVoicePhrase() async {
-    final phrase = TrainingPhrase(id: TrainingPhrase.newId(), text: '');
-    _textControllers[phrase.id] = TextEditingController();
-    setState(() => _phrases.add(phrase));
-    await _toggleRecording(phrase);
   }
 
   Future<void> _delete(TrainingPhrase phrase) async {
@@ -233,122 +280,131 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Фразы для обучения'),
-      actions: [
-        IconButton(
-          key: const Key('savePhrases'),
-          onPressed: _recordingId == null ? _save : null,
-          icon: const Icon(Icons.check),
-          tooltip: 'Сохранить',
-        ),
-      ],
-    ),
-    body: ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _phrases.length,
-      itemBuilder: (context, index) {
-        final phrase = _phrases[index];
-        final recording = _recordingId == phrase.id;
-        final anotherRecording = _recordingId != null && !recording;
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                TextField(
-                  key: Key('phraseText-${phrase.id}'),
-                  controller: _textControllers[phrase.id],
-                  maxLines: null,
-                  decoration: InputDecoration(
-                    labelText: 'Фраза',
-                    errorText: _emptyRecordedPhraseIds.contains(phrase.id)
-                        ? 'Введите текст записанной фразы'
-                        : null,
-                  ),
-                  onChanged: (text) {
-                    _emptyRecordedPhraseIds.remove(phrase.id);
-                    _replace(_current(phrase.id).copyWith(text: text));
-                  },
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton.icon(
-                      key: Key('recordPhrase-${phrase.id}'),
-                      onPressed: anotherRecording
-                          ? null
-                          : () => _toggleRecording(phrase),
-                      icon: Icon(recording ? Icons.stop : Icons.mic),
-                      label: Text(recording ? 'Остановить' : 'Записать'),
-                    ),
-                    TextButton.icon(
-                      onPressed:
-                          phrase.recordedAudioPath == null ||
-                              _recordingId != null
-                          ? null
-                          : () => _player.playIfAvailable(
-                              phrase.recordedAudioPath,
-                            ),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Прослушать'),
-                    ),
-                    TextButton.icon(
-                      onPressed:
-                          phrase.recordedAudioPath == null ||
-                              _recordingId != null
-                          ? null
-                          : () async {
-                              await _recorder.delete(phrase.recordedAudioPath);
-                              _replace(phrase.copyWith(clearRecording: true));
-                            },
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Удалить запись'),
-                    ),
-                    TextButton.icon(
-                      onPressed: _phrases.length == 1 || _recordingId != null
-                          ? null
-                          : () => _delete(phrase),
-                      icon: const Icon(Icons.remove_circle_outline),
-                      label: const Text('Удалить фразу'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final recordingNewVoice =
+        _newVoiceRecordingId != null && _recordingId == _newVoiceRecordingId;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Фразы для обучения'),
+        actions: [
+          IconButton(
+            key: const Key('savePhrases'),
+            onPressed: _recordingId == null ? _save : null,
+            icon: const Icon(Icons.check),
+            tooltip: 'Сохранить',
           ),
-        );
-      },
-    ),
-    bottomNavigationBar: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('addTextPhrase'),
-                onPressed: _recordingId == null ? _addTextPhrase : null,
-                icon: const Icon(Icons.add),
-                label: const Text('Текст'),
+        ],
+      ),
+      body: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(16),
+        itemCount: _phrases.length,
+        itemBuilder: (context, index) {
+          final phrase = _phrases[index];
+          final recording = _recordingId == phrase.id;
+          final anotherRecording = _recordingId != null && !recording;
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  TextField(
+                    key: Key('phraseText-${phrase.id}'),
+                    controller: _textControllers[phrase.id],
+                    maxLines: null,
+                    decoration: InputDecoration(
+                      labelText: 'Фраза',
+                      errorText: _emptyRecordedPhraseIds.contains(phrase.id)
+                          ? 'Введите текст записанной фразы'
+                          : null,
+                    ),
+                    onChanged: (text) {
+                      _emptyRecordedPhraseIds.remove(phrase.id);
+                      _replace(_current(phrase.id).copyWith(text: text));
+                    },
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        key: Key('recordPhrase-${phrase.id}'),
+                        onPressed: anotherRecording
+                            ? null
+                            : () => _toggleRecording(phrase),
+                        icon: Icon(recording ? Icons.stop : Icons.mic),
+                        label: Text(recording ? 'Остановить' : 'Записать'),
+                      ),
+                      TextButton.icon(
+                        onPressed:
+                            phrase.recordedAudioPath == null ||
+                                _recordingId != null
+                            ? null
+                            : () => _player.playIfAvailable(
+                                phrase.recordedAudioPath,
+                              ),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Прослушать'),
+                      ),
+                      TextButton.icon(
+                        onPressed:
+                            phrase.recordedAudioPath == null ||
+                                _recordingId != null
+                            ? null
+                            : () async {
+                                await _recorder.delete(
+                                  phrase.recordedAudioPath,
+                                );
+                                _replace(phrase.copyWith(clearRecording: true));
+                              },
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Удалить запись'),
+                      ),
+                      TextButton.icon(
+                        onPressed: _phrases.length == 1 || _recordingId != null
+                            ? null
+                            : () => _delete(phrase),
+                        icon: const Icon(Icons.remove_circle_outline),
+                        label: const Text('Удалить фразу'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('addVoicePhrase'),
-                onPressed: _recordingId == null ? _addVoicePhrase : null,
-                icon: const Icon(Icons.mic),
-                label: const Text('Голос'),
+          );
+        },
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  key: const Key('addTextPhrase'),
+                  onPressed: _recordingId == null ? _addTextPhrase : null,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Текст'),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  key: const Key('addVoicePhrase'),
+                  onPressed: _recordingId == null || recordingNewVoice
+                      ? _toggleNewVoiceRecording
+                      : null,
+                  icon: Icon(recordingNewVoice ? Icons.stop : Icons.mic),
+                  label: Text(recordingNewVoice ? 'Стоп' : 'Голос'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   void dispose() {
@@ -358,6 +414,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
     } else if (_recordingId != null) {
       unawaited(_recorder.cancel());
     }
+    _scrollController.dispose();
     for (final controller in _textControllers.values) {
       controller.dispose();
     }
