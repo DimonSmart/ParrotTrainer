@@ -1,3 +1,7 @@
+---
+title: Parrot Trainer Privacy Policy
+---
+
 # Privacy Policy — Parrot Trainer
 
 Effective date: August 23, 2026
