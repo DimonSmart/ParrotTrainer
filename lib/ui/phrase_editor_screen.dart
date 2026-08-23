@@ -6,6 +6,7 @@ import '../models/training_phrase.dart';
 import '../services/phrase_recorder.dart';
 import '../services/recorded_phrase_player.dart';
 import '../services/speech_recognition_service.dart';
+import '../l10n/app_strings.dart';
 
 class PhraseEditorScreen extends StatefulWidget {
   const PhraseEditorScreen({
@@ -285,13 +286,13 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         _newVoiceRecordingId != null && _recordingId == _newVoiceRecordingId;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Фразы для обучения'),
+        title: Text(context.strings.phrases),
         actions: [
           IconButton(
             key: const Key('savePhrases'),
             onPressed: _recordingId == null ? _save : null,
             icon: const Icon(Icons.check),
-            tooltip: 'Сохранить',
+            tooltip: context.strings.save,
           ),
         ],
       ),
@@ -313,7 +314,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                     controller: _textControllers[phrase.id],
                     maxLines: null,
                     decoration: InputDecoration(
-                      labelText: 'Фраза',
+                      labelText: context.strings.phrase,
                       errorText: _emptyRecordedPhraseIds.contains(phrase.id)
                           ? 'Введите текст записанной фразы'
                           : null,
@@ -332,7 +333,11 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                             ? null
                             : () => _toggleRecording(phrase),
                         icon: Icon(recording ? Icons.stop : Icons.mic),
-                        label: Text(recording ? 'Остановить' : 'Записать'),
+                        label: Text(
+                          recording
+                              ? context.strings.stop
+                              : context.strings.record,
+                        ),
                       ),
                       TextButton.icon(
                         onPressed:
@@ -343,7 +348,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                                 phrase.recordedAudioPath,
                               ),
                         icon: const Icon(Icons.play_arrow),
-                        label: const Text('Прослушать'),
+                        label: Text(context.strings.listen),
                       ),
                       TextButton.icon(
                         onPressed:
@@ -357,14 +362,14 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                                 _replace(phrase.copyWith(clearRecording: true));
                               },
                         icon: const Icon(Icons.delete_outline),
-                        label: const Text('Удалить запись'),
+                        label: Text(context.strings.deleteRecording),
                       ),
                       TextButton.icon(
                         onPressed: _phrases.length == 1 || _recordingId != null
                             ? null
                             : () => _delete(phrase),
                         icon: const Icon(Icons.remove_circle_outline),
-                        label: const Text('Удалить фразу'),
+                        label: Text(context.strings.deletePhrase),
                       ),
                     ],
                   ),
@@ -385,7 +390,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                   key: const Key('addTextPhrase'),
                   onPressed: _recordingId == null ? _addTextPhrase : null,
                   icon: const Icon(Icons.add),
-                  label: const Text('Текст'),
+                  label: Text(context.strings.text),
                 ),
               ),
               const SizedBox(width: 12),
@@ -396,7 +401,11 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                       ? _toggleNewVoiceRecording
                       : null,
                   icon: Icon(recordingNewVoice ? Icons.stop : Icons.mic),
-                  label: Text(recordingNewVoice ? 'Стоп' : 'Голос'),
+                  label: Text(
+                    recordingNewVoice
+                        ? context.strings.stop
+                        : context.strings.voice,
+                  ),
                 ),
               ),
             ],

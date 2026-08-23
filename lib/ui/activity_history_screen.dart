@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/app_controller.dart';
 import '../models/activity_history.dart';
+import '../l10n/app_strings.dart';
 
 class ActivityHistoryScreen extends StatefulWidget {
   const ActivityHistoryScreen({super.key, required this.controller});
@@ -64,7 +65,7 @@ class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
     final day = _days[_key(_selected)];
     final hasAnyHistory = _days.isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: const Text('Активность'), centerTitle: true),
+      appBar: AppBar(title: Text(context.strings.activity), centerTitle: true),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
@@ -86,11 +87,9 @@ class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
                 ),
               )
             else if (!hasAnyHistory && _isCurrentMonth(_month))
-              const _MessageCard(
-                'История тренировок пока пуста.\nОна появится после следующей тренировки.',
-              )
+              _MessageCard(context.strings.noHistory)
             else if (day == null)
-              const _MessageCard('Нет данных о тренировках за этот день.')
+              _MessageCard(context.strings.noDayData)
             else ...[
               _Summary(day: day),
               const SizedBox(height: 14),
@@ -138,11 +137,11 @@ class _Calendar extends StatelessWidget {
                 IconButton(
                   onPressed: onPrevious,
                   icon: const Icon(Icons.chevron_left),
-                  tooltip: 'Предыдущий месяц',
+                  tooltip: context.strings.previousMonth,
                 ),
                 Expanded(
                   child: Text(
-                    _monthName(month),
+                    _monthName(context, month),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -153,14 +152,14 @@ class _Calendar extends StatelessWidget {
                 IconButton(
                   onPressed: onNext,
                   icon: const Icon(Icons.chevron_right),
-                  tooltip: 'Следующий месяц',
+                  tooltip: context.strings.nextMonth,
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Row(
               children: [
-                for (final label in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'])
+                for (final label in context.strings.weekdays)
                   Expanded(
                     child: Center(
                       child: Text(
@@ -260,24 +259,30 @@ class _Summary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Статистика за ${_dateLabel(day.date)}',
+            context.strings.statisticsFor(_dateLabel(day.date)),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: const Color(0xFF207B25),
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 14),
-          _row('Активность', '${day.soundEvents} звуков'),
-          _row('Сказано фраз', '${day.phrasesSpoken}'),
           _row(
-            'В ответ на чириканье',
+            context.strings.activity,
+            context.strings.sounds(day.soundEvents),
+          ),
+          _row(context.strings.phrasesSpoken, '${day.phrasesSpoken}'),
+          _row(
+            context.strings.responsesToChirps,
             '${day.responsesToSound} (${_percent(day.responsePercent)})',
           ),
           _row(
-            'Попугай ответил',
+            context.strings.parrotReplied,
             '${day.birdRepliesAfterApp} / ${day.birdReplyOpportunities} (${_percent(day.birdReplyPercent)})',
           ),
-          _row('Время тренировки', _duration(day.trainingSeconds)),
+          _row(
+            context.strings.trainingTime,
+            context.strings.duration(day.trainingSeconds),
+          ),
         ],
       ),
     ),
@@ -316,7 +321,7 @@ class _Heatmap extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Активность по времени',
+              context.strings.activityByTime,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: const Color(0xFF207B25),
                 fontWeight: FontWeight.w800,
@@ -497,29 +502,9 @@ bool _isCurrentMonth(DateTime value) {
 }
 
 String _percent(int? value) => value == null ? '—' : '$value%';
-String _duration(int seconds) {
-  final duration = Duration(seconds: seconds);
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60);
-  return hours > 0 ? '$hours ч $minutes мин' : '$minutes мин';
-}
-
 String _dateLabel(DateTime value) =>
     '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
-String _monthName(DateTime value) {
-  final name = const [
-    'Январь',
-    'Февраль',
-    'Март',
-    'Апрель',
-    'Май',
-    'Июнь',
-    'Июль',
-    'Август',
-    'Сентябрь',
-    'Октябрь',
-    'Ноябрь',
-    'Декабрь',
-  ][value.month - 1];
+String _monthName(BuildContext context, DateTime value) {
+  final name = context.strings.months[value.month - 1];
   return '$name ${value.year}';
 }

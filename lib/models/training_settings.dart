@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'training_phrase.dart';
 
 class TrainingSettings {
@@ -35,11 +37,25 @@ class TrainingSettings {
                  : idlePromptMinInterval)
            : idlePromptMaxInterval;
 
-  static final defaults = TrainingSettings(
-    phrases: const [
-      TrainingPhrase(id: 'default-hello', text: 'Привет'),
-      TrainingPhrase(id: 'default-bird', text: 'Привет, моя птичка'),
-      TrainingPhrase(id: 'default-parrot', text: 'Арчик, говорящий попугайчик'),
+  static TrainingSettings get defaults =>
+      defaultsFor(PlatformDispatcher.instance.locale.languageCode);
+
+  static TrainingSettings defaultsFor(String languageCode) => TrainingSettings(
+    phrases: [
+      TrainingPhrase(
+        id: 'default-hello',
+        text: languageCode == 'en' ? 'Hello!' : 'Привет',
+      ),
+      TrainingPhrase(
+        id: 'default-bird',
+        text: languageCode == 'en' ? 'Good bird!' : 'Привет, моя птичка',
+      ),
+      TrainingPhrase(
+        id: 'default-parrot',
+        text: languageCode == 'en'
+            ? 'Pretty bird!'
+            : 'Арчик, говорящий попугайчик',
+      ),
     ],
     soundThresholdDb: -42,
     minimumInterval: const Duration(seconds: 5),

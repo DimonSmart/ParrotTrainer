@@ -11,6 +11,7 @@ import 'voices_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'activity_history_screen.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../l10n/app_strings.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -95,13 +96,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _retryMicrophone() async {
     await controller.resumeForeground();
     if (!mounted || controller.microphoneAvailable) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Доступ к микрофону не предоставлен. Разрешите его в настройках Android.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.strings.microphoneDenied)));
   }
 
   Future<void> _toggleTraining(bool enabled) async {
@@ -110,21 +107,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
     if (!controller.settings.isWithinScheduledHours(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сейчас вне установленного времени обучения.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.strings.outsideSchedule)));
       return;
     }
     final started = await controller.startTraining();
     if (!started && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Без доступа к микрофону тренировка не может быть запущена.',
-          ),
-        ),
+        SnackBar(content: Text(context.strings.cannotStartWithoutMicrophone)),
       );
     }
   }
@@ -210,12 +201,12 @@ class _PhrasesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _SectionCard(
-    title: 'Фразы для обучения',
+    title: context.strings.phrases,
     onTap: () => _open(context),
     trailing: IconButton(
       onPressed: () => _open(context),
       icon: const Icon(Icons.edit_outlined),
-      tooltip: 'Редактировать',
+      tooltip: context.strings.edit,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,14 +222,17 @@ class _PhrasesCard extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            const Text('Изучаем сейчас: '),
+            Text(context.strings.learningNow),
             Expanded(
               child: DropdownButton<String>(
                 isExpanded: true,
                 value: controller.settings.focusPhraseId,
-                hint: const Text('Все фразы'),
+                hint: Text(context.strings.allPhrases),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Все фразы')),
+                  DropdownMenuItem(
+                    value: null,
+                    child: Text(context.strings.allPhrases),
+                  ),
                   ...controller.settings.phrases.map(
                     (phrase) => DropdownMenuItem(
                       value: phrase.id,
@@ -270,14 +264,17 @@ class _MicrophoneCard extends StatelessWidget {
     final threshold = dbToNormalized(controller.settings.soundThresholdDb);
     final detected = controller.session.isSoundActive;
     return _SectionCard(
-      title: 'Микрофон и звук',
+      title: context.strings.microphone,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Уровень звука', style: TextStyle(fontSize: 17)),
+              Text(
+                context.strings.soundLevel,
+                style: const TextStyle(fontSize: 17),
+              ),
               Text(
                 '${(level * 100).round()}%',
                 style: const TextStyle(
@@ -301,7 +298,9 @@ class _MicrophoneCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  detected ? 'СЛЫШУ ЗВУК' : 'Тишина',
+                  detected
+                      ? context.strings.hearingSound
+                      : context.strings.silence,
                   style: TextStyle(
                     fontWeight: detected ? FontWeight.w800 : FontWeight.normal,
                     color: detected
@@ -316,7 +315,10 @@ class _MicrophoneCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Порог срабатывания', style: TextStyle(fontSize: 16)),
+              Text(
+                context.strings.threshold,
+                style: const TextStyle(fontSize: 16),
+              ),
               Text(
                 '${(threshold * 100).round()}%',
                 style: const TextStyle(
@@ -343,8 +345,10 @@ class _MicrophoneCard extends StatelessWidget {
             icon: const Icon(Icons.tune),
             label: Text(
               controller.calibrating
-                  ? 'Калибровка… ${controller.calibrationSecondsLeft} сек'
-                  : 'Калибровать микрофон',
+                  ? context.strings.calibration(
+                      controller.calibrationSecondsLeft,
+                    )
+                  : context.strings.calibrateMicrophone,
             ),
           ),
         ],
@@ -418,15 +422,15 @@ class _IntervalsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = controller.settings;
     return _SectionCard(
-      title: 'Паузы и интервалы',
+      title: context.strings.intervals,
       child: Column(
         children: [
           _DurationSlider(
-            label: 'Минимальный интервал',
+            label: context.strings.minimumInterval,
             value: settings.minimumInterval.inSeconds.toDouble(),
             min: 1,
             max: 30,
-            suffix: 'сек',
+            suffix: context.strings.seconds,
             divisions: 29,
             onChanged: (value) {
               final min = Duration(seconds: value.round());
@@ -450,12 +454,12 @@ class _IntervalsCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Инициировать разговор',
+                    Text(
+                      context.strings.startConversation,
                       style: TextStyle(fontSize: 16),
                     ),
                     Text(
-                      '${settings.idlePromptMinInterval.inSeconds}–${settings.idlePromptMaxInterval.inSeconds} сек',
+                      '${settings.idlePromptMinInterval.inSeconds}–${settings.idlePromptMaxInterval.inSeconds} ${context.strings.seconds}',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -495,11 +499,11 @@ class _IntervalsCard extends StatelessWidget {
             ),
           ),
           _DurationSlider(
-            label: 'Пауза для ответа',
+            label: context.strings.responsePause,
             value: settings.silenceAfterSound.inMilliseconds / 1000,
             min: .5,
             max: 5,
-            suffix: 'сек',
+            suffix: context.strings.seconds,
             divisions: 18,
             decimals: 1,
             onChanged: (value) => controller.updateSettings(
@@ -550,13 +554,13 @@ class _ScheduleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = controller.settings;
     return _SectionCard(
-      title: 'Время работы',
+      title: context.strings.schedule,
       child: Column(
         children: [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Работать по расписанию'),
-            subtitle: const Text('Вне этого времени тренировка выключается'),
+            title: Text(context.strings.followSchedule),
+            subtitle: Text(context.strings.scheduleDescription),
             value: settings.dailyScheduleEnabled,
             onChanged: (value) => controller.updateSettings(
               settings.copyWith(dailyScheduleEnabled: value),
@@ -565,23 +569,21 @@ class _ScheduleCard extends StatelessWidget {
           if (settings.dailyScheduleEnabled) ...[
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Начало'),
+              title: Text(context.strings.start),
               trailing: Text(_format(context, settings.scheduleStartMinute)),
               onTap: () => _pickTime(context, true),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Окончание'),
+              title: Text(context.strings.end),
               trailing: Text(_format(context, settings.scheduleEndMinute)),
               onTap: () => _pickTime(context, false),
             ),
           ],
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Разрешить выключение экрана'),
-            subtitle: const Text(
-              'Тренировка продолжится с уведомлением в строке состояния',
-            ),
+            title: Text(context.strings.allowScreenSleep),
+            subtitle: Text(context.strings.screenSleepDescription),
             value: settings.allowScreenToSleep,
             onChanged: (value) => controller.updateSettings(
               settings.copyWith(allowScreenToSleep: value),
@@ -642,7 +644,7 @@ class _VoicesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = controller.settings.selectedVoiceIds.length;
     return _SectionCard(
-      title: 'Голос и речь',
+      title: context.strings.voiceAndSpeech,
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => VoicesScreen(controller: controller)),
@@ -654,8 +656,8 @@ class _VoicesCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   selected == 0
-                      ? 'Голос Android по умолчанию'
-                      : 'Выбрано голосов: $selected',
+                      ? context.strings.defaultAndroidVoice
+                      : context.strings.selectedVoices(selected),
                   style: const TextStyle(fontSize: 17),
                 ),
               ),
@@ -693,7 +695,7 @@ class _VoicesCard extends StatelessWidget {
                 ? null
                 : controller.markGoodAttempt,
             icon: const Icon(Icons.star_outline),
-            label: const Text('Хорошая попытка'),
+            label: Text(context.strings.goodAttempt),
           ),
         ],
       ),
@@ -708,7 +710,7 @@ class _StatisticsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final stats = controller.statistics;
     return _SectionCard(
-      title: 'Статистика',
+      title: context.strings.statistics,
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -720,7 +722,7 @@ class _StatisticsCard extends StatelessWidget {
           Expanded(
             child: _StatBox(
               icon: Icons.chat_bubble,
-              label: 'Сказано фраз',
+              label: context.strings.phrasesSpoken,
               value: '${stats.totalPhrasesSpoken}',
               color: Colors.green,
             ),
@@ -729,7 +731,7 @@ class _StatisticsCard extends StatelessWidget {
           Expanded(
             child: _StatBox(
               icon: Icons.flutter_dash,
-              label: 'В ответ на чириканье',
+              label: context.strings.responsesToChirps,
               value: '${stats.responsesToSound} (${stats.responsePercent}%)',
               color: Colors.lightBlue,
             ),
@@ -809,8 +811,8 @@ class _StartPanel extends StatelessWidget {
                         children: [
                           Text(
                             running
-                                ? 'ПРОГРАММА ВКЛЮЧЕНА'
-                                : 'ПРОГРАММА ВЫКЛЮЧЕНА',
+                                ? context.strings.programOn
+                                : context.strings.programOff,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -864,14 +866,14 @@ class _NextSpeechProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = isSpeaking
-        ? 'Говорю…'
+        ? context.strings.speaking
         : remaining == null
-        ? 'Жду тишины'
-        : '${remaining!.inSeconds + 1} с';
+        ? context.strings.waitingForSilence
+        : '${remaining!.inSeconds + 1} ${context.strings.seconds}';
     return Semantics(
       label: remaining == null
           ? label
-          : 'Следующая фраза через ${remaining!.inSeconds + 1} секунд',
+          : context.strings.nextPhraseIn(remaining!.inSeconds + 1),
       child: Stack(
         alignment: Alignment.centerRight,
         children: [
@@ -914,10 +916,8 @@ class _MicrophoneWarning extends StatelessWidget {
         children: [
           const Icon(Icons.mic_off, color: Colors.deepOrange),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text('Для измерения звука нужен доступ к микрофону.'),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('Повторить')),
+          Expanded(child: Text(context.strings.microphoneNeeded)),
+          TextButton(onPressed: onRetry, child: Text(context.strings.retry)),
         ],
       ),
     ),

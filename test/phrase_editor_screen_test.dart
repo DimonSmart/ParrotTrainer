@@ -32,10 +32,7 @@ void main() {
 
     expect(find.byType(TextField), findsOneWidget);
     expect(fixture.speech.startCalls, 1);
-    expect(
-      find.widgetWithText(FilledButton, 'Стоп'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('addVoicePhrase')), findsOneWidget);
   });
 
   testWidgets('stopping the voice action creates the recorded phrase', (
@@ -46,7 +43,7 @@ void main() {
     await recordNewVoicePhrase(tester);
 
     expect(find.byType(TextField), findsNWidgets(2));
-    expect(find.widgetWithText(FilledButton, 'Голос'), findsOneWidget);
+    expect(find.byKey(const Key('addVoicePhrase')), findsOneWidget);
   });
 
   testWidgets('successful recognition fills empty text', (tester) async {

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../models/training_settings.dart';
@@ -52,7 +54,11 @@ class AndroidTtsService implements TtsService {
     TtsVoice? voice,
   ) async {
     await _ready;
-    await _tts.setLanguage('ru-RU');
+    await _tts.setLanguage(
+      PlatformDispatcher.instance.locale.languageCode == 'en'
+          ? 'en-US'
+          : 'ru-RU',
+    );
     if (voice != null) await _tts.setVoice(voice.platformValue);
     await _tts.setSpeechRate(settings.speechRate);
     await _tts.setPitch(settings.speechPitch);

@@ -308,13 +308,18 @@ class AppController extends ChangeNotifier {
 
   Future<void> previewVoice(TtsVoice voice) async {
     await session.stop();
-    await tts.speak('Привет, моя птичка', settings, voice);
+    await tts.speak(_previewPhrase, settings, voice);
   }
 
   Future<void> previewSpeechSettings() async {
     await session.stop();
-    await tts.speak('Привет, моя птичка', settings, null);
+    await tts.speak(_previewPhrase, settings, null);
   }
+
+  String get _previewPhrase =>
+      PlatformDispatcher.instance.locale.languageCode == 'en'
+      ? 'Good bird!'
+      : 'Привет, моя птичка';
 
   @override
   void dispose() {

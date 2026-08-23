@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/app_controller.dart';
 import '../services/tts_service.dart';
+import '../l10n/app_strings.dart';
 
 class VoicesScreen extends StatefulWidget {
   const VoicesScreen({super.key, required this.controller});
@@ -27,7 +28,7 @@ class _VoicesScreenState extends State<VoicesScreen> {
             voice.locale.toLowerCase().contains(filter);
       }).toList();
       return Scaffold(
-        appBar: AppBar(title: const Text('Голоса и речь')),
+        appBar: AppBar(title: Text(context.strings.voiceAndSpeech)),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -38,12 +39,12 @@ class _VoicesScreenState extends State<VoicesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Настройки речи',
+                      context.strings.voiceSettings,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     _SettingSlider(
-                      label: 'Скорость речи',
+                      label: context.strings.speechRate,
                       value: settings.speechRate,
                       min: 0.2,
                       max: 0.8,
@@ -52,7 +53,7 @@ class _VoicesScreenState extends State<VoicesScreen> {
                       ),
                     ),
                     _SettingSlider(
-                      label: 'Высота голоса',
+                      label: context.strings.pitch,
                       value: settings.speechPitch,
                       min: 0.5,
                       max: 2,
@@ -61,7 +62,7 @@ class _VoicesScreenState extends State<VoicesScreen> {
                       ),
                     ),
                     _SettingSlider(
-                      label: 'Громкость',
+                      label: context.strings.volume,
                       value: settings.speechVolume,
                       min: 0,
                       max: 1,
@@ -74,7 +75,7 @@ class _VoicesScreenState extends State<VoicesScreen> {
                       key: const Key('previewSpeechSettings'),
                       onPressed: controller.previewSpeechSettings,
                       icon: const Icon(Icons.volume_up_outlined),
-                      label: const Text('Проверить звучание'),
+                      label: Text(context.strings.testSound),
                     ),
                   ],
                 ),
@@ -82,41 +83,37 @@ class _VoicesScreenState extends State<VoicesScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Установленные голоса',
+              context.strings.installedVoices,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Можно выбрать несколько. Если ничего не выбрано, используется голос Android по умолчанию.',
-            ),
+            Text(context.strings.voiceSelectionHint),
             const SizedBox(height: 12),
             TextField(
               key: const Key('voiceFilter'),
               onChanged: (value) => setState(() => _voiceFilter = value),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.search),
-                labelText: 'Фильтр голосов',
-                hintText: 'Например, ru или Russian',
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.search),
+                labelText: context.strings.voiceFilter,
+                hintText: context.strings.voiceFilterHint,
               ),
             ),
             const SizedBox(height: 12),
             if (controller.voices.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
                   padding: EdgeInsets.all(20),
-                  child: Text(
-                    'Android не сообщил об установленных TTS-голосах. Проверьте настройки синтеза речи.',
-                  ),
+                  child: Text(context.strings.noVoices),
                 ),
               )
             else if (voices.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
                   padding: EdgeInsets.all(20),
-                  child: Text('По этому фильтру голоса не найдены.'),
+                  child: Text(context.strings.noFilteredVoices),
                 ),
               )
             else
