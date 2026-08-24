@@ -205,10 +205,10 @@ class _Calendar extends StatelessWidget {
                   selected: selectedDay,
                   label:
                       '${value.day} ${sounds > 0
-                          ? '$sounds звуков'
+                          ? context.strings.sounds(sounds)
                           : active > 0
-                          ? 'тренировка без звуков'
-                          : 'нет данных'}',
+                          ? context.strings.trainingWithoutSounds
+                          : context.strings.noDataShort}',
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () => onSelect(value),
@@ -347,17 +347,23 @@ class _Heatmap extends StatelessWidget {
             for (var hour = from; hour <= to; hour++)
               _HeatmapRow(hour: hour, day: day, maximum: maximum),
             const SizedBox(height: 12),
-            const Wrap(
+            Wrap(
               spacing: 10,
               runSpacing: 6,
               children: [
-                _Legend(color: Color(0xFFE0E0E0), text: 'выкл.'),
                 _Legend(
-                  color: Color(0xFFFFFFFF),
-                  outlined: true,
-                  text: 'работала, тихо',
+                  color: const Color(0xFFE0E0E0),
+                  text: context.strings.activityOff,
                 ),
-                _Legend(color: Color(0xFF51A85A), text: 'активность'),
+                _Legend(
+                  color: const Color(0xFFFFFFFF),
+                  outlined: true,
+                  text: context.strings.activityRunningQuiet,
+                ),
+                _Legend(
+                  color: const Color(0xFF51A85A),
+                  text: context.strings.activityLegend,
+                ),
               ],
             ),
           ],
@@ -421,10 +427,10 @@ class _HeatCell extends StatelessWidget {
         : const Color(0xFFE0E0E0);
     return Semantics(
       label: sounds > 0
-          ? '$sounds звуков'
+          ? context.strings.sounds(sounds)
           : active > 0
-          ? 'Тренировка работала, звуков нет'
-          : 'Тренировка выключена',
+          ? context.strings.trainingRunningNoSounds
+          : context.strings.trainingStopped,
       child: Container(
         height: 33,
         alignment: Alignment.center,

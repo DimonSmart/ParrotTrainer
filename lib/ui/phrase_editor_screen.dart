@@ -125,11 +125,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         await _recorder.start(phraseId);
         if (mounted && _coordinatedRecordingUnavailable) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Распознавание недоступно, используется обычная запись',
-              ),
-            ),
+            SnackBar(content: Text(context.strings.recognitionUnavailable)),
           );
         }
       }
@@ -141,9 +137,9 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Не удалось начать запись')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.strings.recordingStartFailed)),
+      );
     }
   }
 
@@ -194,22 +190,20 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
       }
       if (recognitionError != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Запись сохранена, но речь распознать не удалось'),
-          ),
+          SnackBar(content: Text(context.strings.recordingSavedRecognitionFailed)),
         );
       }
     } on EmptyAudioRecordingException {
       _coordinatedRecordingUnavailable = true;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось записать звук')),
+          SnackBar(content: Text(context.strings.recordingFailed)),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось записать звук')),
+          SnackBar(content: Text(context.strings.recordingFailed)),
         );
       }
     } finally {
@@ -262,9 +256,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
           ..addAll(invalidRecorded);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Введите текст для каждой записанной фразы'),
-        ),
+        SnackBar(content: Text(context.strings.enterTextForRecordedPhrases)),
       );
       return;
     }
@@ -273,7 +265,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
         .toList();
     if (valid.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Добавьте хотя бы одну фразу')),
+        SnackBar(content: Text(context.strings.addAtLeastOnePhrase)),
       );
       return;
     }
@@ -316,7 +308,7 @@ class _PhraseEditorScreenState extends State<PhraseEditorScreen>
                     decoration: InputDecoration(
                       labelText: context.strings.phrase,
                       errorText: _emptyRecordedPhraseIds.contains(phrase.id)
-                          ? 'Введите текст записанной фразы'
+                          ? context.strings.recordedPhraseTextRequired
                           : null,
                     ),
                     onChanged: (text) {

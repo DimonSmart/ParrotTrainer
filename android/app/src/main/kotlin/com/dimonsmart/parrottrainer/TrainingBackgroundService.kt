@@ -33,10 +33,11 @@ class TrainingBackgroundService : Service() {
 
     private fun startForegroundWithNotification() {
         val channelId = "training_background"
+        val english = isEnglish()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Обучение попугая",
+                if (english) "Parrot training" else "Обучение попугая",
                 NotificationManager.IMPORTANCE_LOW,
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -48,8 +49,16 @@ class TrainingBackgroundService : Service() {
         }
         val notification = notificationBuilder
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle("Parrot Trainer работает")
-            .setContentText("Обучение продолжается при выключенном экране")
+            .setContentTitle(
+                if (english) "Parrot Trainer is running" else "Parrot Trainer работает",
+            )
+            .setContentText(
+                if (english) {
+                    "Training continues while the screen is off"
+                } else {
+                    "Обучение продолжается при выключенном экране"
+                },
+            )
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -57,6 +66,16 @@ class TrainingBackgroundService : Service() {
         } else {
             startForeground(101, notification)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isEnglish(): Boolean {
+        val language = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            resources.configuration.locales[0].language
+        } else {
+            resources.configuration.locale.language
+        }
+        return language.equals("en", ignoreCase = true)
     }
 
     companion object {

@@ -143,7 +143,7 @@ class _VoiceTile extends StatelessWidget {
         subtitle: Text(voice.locale),
         secondary: IconButton(
           icon: const Icon(Icons.play_circle_outline),
-          tooltip: 'Прослушать',
+          tooltip: context.strings.listen,
           onPressed: () => controller.previewVoice(voice),
         ),
         onChanged: (value) {

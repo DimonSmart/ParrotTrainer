@@ -117,15 +117,22 @@ class TrainingSessionController extends ChangeNotifier {
               .clamp(0, 1);
   }
 
+  bool get _english =>
+      PlatformDispatcher.instance.locale.languageCode.toLowerCase() == 'en';
+
   String get stateLabel => switch (state) {
-    TrainingState.stopped => 'Программа выключена',
-    TrainingState.minimumInterval => 'Защитный интервал',
-    TrainingState.listening => 'Слушаю',
-    TrainingState.soundDetected => 'Слышу попугая',
-    TrainingState.waitingForSilence => 'Жду тишины',
-    TrainingState.speaking => 'Говорю',
-    TrainingState.postSpeechGuard => 'Слушаю…',
-    TrainingState.quietPeriod => 'Тихая пауза',
+    TrainingState.stopped =>
+      _english ? 'Training is off' : 'Программа выключена',
+    TrainingState.minimumInterval =>
+      _english ? 'Safety interval' : 'Защитный интервал',
+    TrainingState.listening => _english ? 'Listening' : 'Слушаю',
+    TrainingState.soundDetected =>
+      _english ? 'Parrot detected' : 'Слышу попугая',
+    TrainingState.waitingForSilence =>
+      _english ? 'Waiting for silence' : 'Жду тишины',
+    TrainingState.speaking => _english ? 'Speaking' : 'Говорю',
+    TrainingState.postSpeechGuard => _english ? 'Listening…' : 'Слушаю…',
+    TrainingState.quietPeriod => _english ? 'Quiet pause' : 'Тихая пауза',
   };
   void updateSettings(TrainingSettings value) {
     _settings = value;

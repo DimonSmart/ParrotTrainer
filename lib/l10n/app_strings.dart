@@ -88,6 +88,25 @@ class AppStrings {
   String get deletePhrase => _english ? 'Delete phrase' : 'Удалить фразу';
   String get text => _english ? 'Text' : 'Текст';
   String get voice => _english ? 'Voice' : 'Голос';
+  String get recognitionUnavailable => _english
+      ? 'Speech recognition is unavailable; using standard recording.'
+      : 'Распознавание недоступно, используется обычная запись';
+  String get recordingStartFailed =>
+      _english ? 'Could not start recording' : 'Не удалось начать запись';
+  String get recordingSavedRecognitionFailed => _english
+      ? 'Recording saved, but speech recognition failed'
+      : 'Запись сохранена, но речь распознать не удалось';
+  String get recordingFailed =>
+      _english ? 'Could not record audio' : 'Не удалось записать звук';
+  String get enterTextForRecordedPhrases => _english
+      ? 'Enter text for each recorded phrase'
+      : 'Введите текст для каждой записанной фразы';
+  String get addAtLeastOnePhrase => _english
+      ? 'Add at least one phrase'
+      : 'Добавьте хотя бы одну фразу';
+  String get recordedPhraseTextRequired => _english
+      ? 'Enter text for the recorded phrase'
+      : 'Введите текст записанной фразы';
   String get voiceSettings => _english ? 'Speech settings' : 'Настройки речи';
   String get speechRate => _english ? 'Speech rate' : 'Скорость речи';
   String get pitch => _english ? 'Pitch' : 'Высота голоса';
@@ -123,6 +142,18 @@ class AppStrings {
   String get trainingTime => _english ? 'Training time' : 'Время тренировки';
   String get activityByTime =>
       _english ? 'Activity by time' : 'Активность по времени';
+  String get trainingWithoutSounds =>
+      _english ? 'training without sounds' : 'тренировка без звуков';
+  String get noDataShort => _english ? 'no data' : 'нет данных';
+  String get activityOff => _english ? 'off' : 'выкл.';
+  String get activityRunningQuiet =>
+      _english ? 'running, quiet' : 'работала, тихо';
+  String get activityLegend => _english ? 'activity' : 'активность';
+  String get trainingRunningNoSounds => _english
+      ? 'Training is running, no sounds'
+      : 'Тренировка работала, звуков нет';
+  String get trainingStopped =>
+      _english ? 'Training is off' : 'Тренировка выключена';
   List<String> get weekdays => _english
       ? const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
       : const ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
