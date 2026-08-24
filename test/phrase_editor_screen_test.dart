@@ -224,6 +224,7 @@ Future<_EditorFixture> _pumpEditor(
   final fixture = _EditorFixture();
   await tester.pumpWidget(
     MaterialApp(
+      locale: const Locale('ru'),
       home: PhraseEditorScreen(
         phrases: phrases,
         recorder: fixture.recorder,
@@ -261,8 +262,8 @@ class FakeRecorder implements PhraseRecordingService {
   FakeRecorder(this.events);
 
   final List<String> events;
-  final List<String> startedIds = [];
   final List<String?> deletedPaths = [];
+  final List<String> startedIds = [];
   String? stopPath = '/fallback.m4a';
 
   @override

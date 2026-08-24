@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'controllers/app_controller.dart';
 import 'ui/home_screen.dart';
+import 'l10n/app_language.dart';
 import 'l10n/generated/app_localizations.dart';
 
 Future<void> main() async {
@@ -27,6 +28,8 @@ class ParrotTrainerApp extends StatelessWidget {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
+    localeResolutionCallback: (locale, _) =>
+        Locale(AppLanguage.resolve(locale?.languageCode).code),
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF3B9B31),

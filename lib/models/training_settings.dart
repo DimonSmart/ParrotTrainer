@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import '../l10n/app_language.dart';
 import 'training_phrase.dart';
 
 class TrainingSettings {
@@ -40,33 +41,45 @@ class TrainingSettings {
   static TrainingSettings get defaults =>
       defaultsFor(PlatformDispatcher.instance.locale.languageCode);
 
-  static TrainingSettings defaultsFor(String languageCode) => TrainingSettings(
-    phrases: [
-      TrainingPhrase(
-        id: 'default-hello',
-        text: languageCode == 'en' ? 'Hello!' : 'Привет',
-      ),
-      TrainingPhrase(
-        id: 'default-bird',
-        text: languageCode == 'en' ? 'Good bird!' : 'Привет, моя птичка',
-      ),
-      TrainingPhrase(
-        id: 'default-parrot',
-        text: languageCode == 'en'
-            ? 'Pretty bird!'
-            : 'Арчик, говорящий попугайчик',
-      ),
-    ],
-    soundThresholdDb: -42,
-    minimumInterval: const Duration(seconds: 5),
-    idlePromptMinInterval: const Duration(seconds: 60),
-    idlePromptMaxInterval: const Duration(seconds: 180),
-    silenceAfterSound: const Duration(seconds: 2),
-    selectedVoiceIds: const [],
-    speechRate: .45,
-    speechPitch: 1,
-    speechVolume: 1,
-  );
+  static TrainingSettings defaultsFor(String languageCode) {
+    final language = AppLanguage.resolve(languageCode);
+    String phrase(String english, String russian, String spanish) =>
+        switch (language) {
+          AppLanguage.english => english,
+          AppLanguage.russian => russian,
+          AppLanguage.spanish => spanish,
+        };
+
+    return TrainingSettings(
+      phrases: [
+        TrainingPhrase(
+          id: 'default-hello',
+          text: phrase('Hello!', 'Привет', '¡Hola!'),
+        ),
+        TrainingPhrase(
+          id: 'default-bird',
+          text: phrase('Good bird!', 'Привет, моя птичка', '¡Buen pajarito!'),
+        ),
+        TrainingPhrase(
+          id: 'default-parrot',
+          text: phrase(
+            'Pretty bird!',
+            'Арчик, говорящий попугайчик',
+            '¡Qué bonito pajarito!',
+          ),
+        ),
+      ],
+      soundThresholdDb: -42,
+      minimumInterval: const Duration(seconds: 5),
+      idlePromptMinInterval: const Duration(seconds: 60),
+      idlePromptMaxInterval: const Duration(seconds: 180),
+      silenceAfterSound: const Duration(seconds: 2),
+      selectedVoiceIds: const [],
+      speechRate: .45,
+      speechPitch: 1,
+      speechVolume: 1,
+    );
+  }
 
   final List<TrainingPhrase> phrases;
   final double soundThresholdDb;

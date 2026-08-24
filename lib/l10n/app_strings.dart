@@ -1,198 +1,346 @@
 import 'package:flutter/widgets.dart';
 
+import 'app_language.dart';
 import 'generated/app_localizations.dart';
 
 /// Short UI strings which are shared by screens that do not need parameters.
 /// ARB continues to own application metadata and the privacy policy.
 class AppStrings {
-  AppStrings._(this._english);
+  AppStrings._(this._language);
 
-  final bool _english;
+  final AppLanguage _language;
 
-  static AppStrings of(BuildContext context) =>
-      AppStrings._(AppLocalizations.of(context)?.localeName == 'en');
+  static AppStrings of(BuildContext context) => AppStrings._(
+    AppLanguage.resolve(
+      AppLocalizations.of(context)?.localeName ??
+          Localizations.localeOf(context).languageCode,
+    ),
+  );
 
-  String get phrases => _english ? 'Training phrases' : 'Фразы для обучения';
-  String get edit => _english ? 'Edit' : 'Редактировать';
-  String get learningNow => _english ? 'Learning now:' : 'Изучаем сейчас:';
-  String get allPhrases => _english ? 'All phrases' : 'Все фразы';
-  String get microphone => _english ? 'Microphone & sound' : 'Микрофон и звук';
-  String get soundLevel => _english ? 'Sound level' : 'Уровень звука';
-  String get hearingSound => _english ? 'SOUND DETECTED' : 'СЛЫШУ ЗВУК';
-  String get silence => _english ? 'Silence' : 'Тишина';
-  String get threshold =>
-      _english ? 'Detection threshold' : 'Порог срабатывания';
-  String get calibrateMicrophone =>
-      _english ? 'Calibrate microphone' : 'Калибровать микрофон';
-  String calibration(int seconds) =>
-      _english ? 'Calibrating… $seconds sec' : 'Калибровка… $seconds сек';
-  String get intervals => _english ? 'Pauses & intervals' : 'Паузы и интервалы';
-  String get minimumInterval =>
-      _english ? 'Minimum interval' : 'Минимальный интервал';
-  String get startConversation =>
-      _english ? 'Start a conversation' : 'Инициировать разговор';
-  String get responsePause =>
-      _english ? 'Pause for a response' : 'Пауза для ответа';
-  String get seconds => _english ? 'sec' : 'сек';
-  String get schedule => _english ? 'Schedule' : 'Время работы';
-  String get followSchedule =>
-      _english ? 'Follow a schedule' : 'Работать по расписанию';
-  String get scheduleDescription => _english
-      ? 'Training stops outside these hours'
-      : 'Вне этого времени тренировка выключается';
-  String get start => _english ? 'Start' : 'Начало';
-  String get end => _english ? 'End' : 'Окончание';
-  String get allowScreenSleep =>
-      _english ? 'Allow screen to turn off' : 'Разрешить выключение экрана';
-  String get screenSleepDescription => _english
-      ? 'Training continues with a status-bar notification'
-      : 'Тренировка продолжится с уведомлением в строке состояния';
-  String get voiceAndSpeech => _english ? 'Voice & speech' : 'Голос и речь';
-  String get defaultAndroidVoice =>
-      _english ? 'Default Android voice' : 'Голос Android по умолчанию';
-  String selectedVoices(int count) =>
-      _english ? 'Selected voices: $count' : 'Выбрано голосов: $count';
-  String get goodAttempt => _english ? 'Good attempt' : 'Хорошая попытка';
-  String get statistics => _english ? 'Statistics' : 'Статистика';
-  String get phrasesSpoken => _english ? 'Phrases spoken' : 'Сказано фраз';
-  String get responsesToChirps =>
-      _english ? 'Responses to chirps' : 'В ответ на чириканье';
-  String get programOn => _english ? 'TRAINING IS ON' : 'ПРОГРАММА ВКЛЮЧЕНА';
-  String get programOff => _english ? 'TRAINING IS OFF' : 'ПРОГРАММА ВЫКЛЮЧЕНА';
-  String get speaking => _english ? 'Speaking…' : 'Говорю…';
-  String get waitingForSilence =>
-      _english ? 'Waiting for silence' : 'Жду тишины';
-  String nextPhraseIn(int seconds) => _english
-      ? 'Next phrase in $seconds seconds'
-      : 'Следующая фраза через $seconds секунд';
-  String get microphoneNeeded => _english
-      ? 'Microphone access is required to measure sound.'
-      : 'Для измерения звука нужен доступ к микрофону.';
-  String get retry => _english ? 'Retry' : 'Повторить';
-  String get microphoneDenied => _english
-      ? 'Microphone access was not granted. Allow it in Android settings.'
-      : 'Доступ к микрофону не предоставлен. Разрешите его в настройках Android.';
-  String get outsideSchedule => _english
-      ? 'This is outside the configured training schedule.'
-      : 'Сейчас вне установленного времени обучения.';
-  String get cannotStartWithoutMicrophone => _english
-      ? 'Training cannot start without microphone access.'
-      : 'Без доступа к микрофону тренировка не может быть запущена.';
-  String get phrase => _english ? 'Phrase' : 'Фраза';
-  String get save => _english ? 'Save' : 'Сохранить';
-  String get record => _english ? 'Record' : 'Записать';
-  String get stop => _english ? 'Stop' : 'Остановить';
-  String get listen => _english ? 'Listen' : 'Прослушать';
+  T _pick<T>(T english, T russian, T spanish) => switch (_language) {
+    AppLanguage.english => english,
+    AppLanguage.russian => russian,
+    AppLanguage.spanish => spanish,
+  };
+
+  String get phrases =>
+      _pick('Training phrases', 'Фразы для обучения', 'Frases de entrenamiento');
+  String get edit => _pick('Edit', 'Редактировать', 'Editar');
+  String get learningNow =>
+      _pick('Learning now:', 'Изучаем сейчас:', 'Aprendiendo ahora:');
+  String get allPhrases =>
+      _pick('All phrases', 'Все фразы', 'Todas las frases');
+  String get microphone =>
+      _pick('Microphone & sound', 'Микрофон и звук', 'Micrófono y sonido');
+  String get soundLevel =>
+      _pick('Sound level', 'Уровень звука', 'Nivel de sonido');
+  String get hearingSound =>
+      _pick('SOUND DETECTED', 'СЛЫШУ ЗВУК', 'SONIDO DETECTADO');
+  String get silence => _pick('Silence', 'Тишина', 'Silencio');
+  String get threshold => _pick(
+    'Detection threshold',
+    'Порог срабатывания',
+    'Umbral de detección',
+  );
+  String get calibrateMicrophone => _pick(
+    'Calibrate microphone',
+    'Калибровать микрофон',
+    'Calibrar micrófono',
+  );
+  String calibration(int seconds) => _pick(
+    'Calibrating… $seconds sec',
+    'Калибровка… $seconds сек',
+    'Calibrando… $seconds s',
+  );
+  String get intervals =>
+      _pick('Pauses & intervals', 'Паузы и интервалы', 'Pausas e intervalos');
+  String get minimumInterval => _pick(
+    'Minimum interval',
+    'Минимальный интервал',
+    'Intervalo mínimo',
+  );
+  String get startConversation => _pick(
+    'Start a conversation',
+    'Инициировать разговор',
+    'Iniciar una conversación',
+  );
+  String get responsePause => _pick(
+    'Pause for a response',
+    'Пауза для ответа',
+    'Pausa para responder',
+  );
+  String get seconds => _pick('sec', 'сек', 's');
+  String get schedule => _pick('Schedule', 'Время работы', 'Horario');
+  String get followSchedule => _pick(
+    'Follow a schedule',
+    'Работать по расписанию',
+    'Seguir un horario',
+  );
+  String get scheduleDescription => _pick(
+    'Training stops outside these hours',
+    'Вне этого времени тренировка выключается',
+    'El entrenamiento se detiene fuera de este horario',
+  );
+  String get start => _pick('Start', 'Начало', 'Inicio');
+  String get end => _pick('End', 'Окончание', 'Fin');
+  String get allowScreenSleep => _pick(
+    'Allow screen to turn off',
+    'Разрешить выключение экрана',
+    'Permitir que se apague la pantalla',
+  );
+  String get screenSleepDescription => _pick(
+    'Training continues with a status-bar notification',
+    'Тренировка продолжится с уведомлением в строке состояния',
+    'El entrenamiento continúa con una notificación en la barra de estado',
+  );
+  String get voiceAndSpeech =>
+      _pick('Voice & speech', 'Голос и речь', 'Voz y habla');
+  String get defaultAndroidVoice => _pick(
+    'Default Android voice',
+    'Голос Android по умолчанию',
+    'Voz predeterminada de Android',
+  );
+  String selectedVoices(int count) => _pick(
+    'Selected voices: $count',
+    'Выбрано голосов: $count',
+    'Voces seleccionadas: $count',
+  );
+  String get goodAttempt =>
+      _pick('Good attempt', 'Хорошая попытка', 'Buen intento');
+  String get statistics => _pick('Statistics', 'Статистика', 'Estadísticas');
+  String get phrasesSpoken =>
+      _pick('Phrases spoken', 'Сказано фраз', 'Frases pronunciadas');
+  String get responsesToChirps => _pick(
+    'Responses to chirps',
+    'В ответ на чириканье',
+    'Respuestas a los trinos',
+  );
+  String get programOn => _pick(
+    'TRAINING IS ON',
+    'ПРОГРАММА ВКЛЮЧЕНА',
+    'ENTRENAMIENTO ACTIVADO',
+  );
+  String get programOff => _pick(
+    'TRAINING IS OFF',
+    'ПРОГРАММА ВЫКЛЮЧЕНА',
+    'ENTRENAMIENTO DESACTIVADO',
+  );
+  String get speaking => _pick('Speaking…', 'Говорю…', 'Hablando…');
+  String get waitingForSilence => _pick(
+    'Waiting for silence',
+    'Жду тишины',
+    'Esperando silencio',
+  );
+  String nextPhraseIn(int seconds) => _pick(
+    'Next phrase in $seconds seconds',
+    'Следующая фраза через $seconds секунд',
+    'Próxima frase en $seconds segundos',
+  );
+  String get microphoneNeeded => _pick(
+    'Microphone access is required to measure sound.',
+    'Для измерения звука нужен доступ к микрофону.',
+    'Se necesita acceso al micrófono para medir el sonido.',
+  );
+  String get retry => _pick('Retry', 'Повторить', 'Reintentar');
+  String get microphoneDenied => _pick(
+    'Microphone access was not granted. Allow it in Android settings.',
+    'Доступ к микрофону не предоставлен. Разрешите его в настройках Android.',
+    'No se concedió acceso al micrófono. Permítelo en los ajustes de Android.',
+  );
+  String get outsideSchedule => _pick(
+    'This is outside the configured training schedule.',
+    'Сейчас вне установленного времени обучения.',
+    'Ahora estás fuera del horario de entrenamiento configurado.',
+  );
+  String get cannotStartWithoutMicrophone => _pick(
+    'Training cannot start without microphone access.',
+    'Без доступа к микрофону тренировка не может быть запущена.',
+    'El entrenamiento no puede empezar sin acceso al micrófono.',
+  );
+  String get phrase => _pick('Phrase', 'Фраза', 'Frase');
+  String get save => _pick('Save', 'Сохранить', 'Guardar');
+  String get record => _pick('Record', 'Записать', 'Grabar');
+  String get stop => _pick('Stop', 'Остановить', 'Detener');
+  String get listen => _pick('Listen', 'Прослушать', 'Escuchar');
   String get deleteRecording =>
-      _english ? 'Delete recording' : 'Удалить запись';
-  String get deletePhrase => _english ? 'Delete phrase' : 'Удалить фразу';
-  String get text => _english ? 'Text' : 'Текст';
-  String get voice => _english ? 'Voice' : 'Голос';
-  String get recognitionUnavailable => _english
-      ? 'Speech recognition is unavailable; using standard recording.'
-      : 'Распознавание недоступно, используется обычная запись';
-  String get recordingStartFailed =>
-      _english ? 'Could not start recording' : 'Не удалось начать запись';
-  String get recordingSavedRecognitionFailed => _english
-      ? 'Recording saved, but speech recognition failed'
-      : 'Запись сохранена, но речь распознать не удалось';
-  String get recordingFailed =>
-      _english ? 'Could not record audio' : 'Не удалось записать звук';
-  String get enterTextForRecordedPhrases => _english
-      ? 'Enter text for each recorded phrase'
-      : 'Введите текст для каждой записанной фразы';
-  String get addAtLeastOnePhrase => _english
-      ? 'Add at least one phrase'
-      : 'Добавьте хотя бы одну фразу';
-  String get recordedPhraseTextRequired => _english
-      ? 'Enter text for the recorded phrase'
-      : 'Введите текст записанной фразы';
-  String get voiceSettings => _english ? 'Speech settings' : 'Настройки речи';
-  String get speechRate => _english ? 'Speech rate' : 'Скорость речи';
-  String get pitch => _english ? 'Pitch' : 'Высота голоса';
-  String get volume => _english ? 'Volume' : 'Громкость';
-  String get testSound => _english ? 'Test sound' : 'Проверить звучание';
+      _pick('Delete recording', 'Удалить запись', 'Eliminar grabación');
+  String get deletePhrase =>
+      _pick('Delete phrase', 'Удалить фразу', 'Eliminar frase');
+  String get text => _pick('Text', 'Текст', 'Texto');
+  String get voice => _pick('Voice', 'Голос', 'Voz');
+  String get recognitionUnavailable => _pick(
+    'Speech recognition is unavailable; using standard recording.',
+    'Распознавание недоступно, используется обычная запись',
+    'El reconocimiento de voz no está disponible; se usará la grabación normal.',
+  );
+  String get recordingStartFailed => _pick(
+    'Could not start recording',
+    'Не удалось начать запись',
+    'No se pudo iniciar la grabación',
+  );
+  String get recordingSavedRecognitionFailed => _pick(
+    'Recording saved, but speech recognition failed',
+    'Запись сохранена, но речь распознать не удалось',
+    'La grabación se guardó, pero falló el reconocimiento de voz',
+  );
+  String get recordingFailed => _pick(
+    'Could not record audio',
+    'Не удалось записать звук',
+    'No se pudo grabar el audio',
+  );
+  String get enterTextForRecordedPhrases => _pick(
+    'Enter text for each recorded phrase',
+    'Введите текст для каждой записанной фразы',
+    'Introduce texto para cada frase grabada',
+  );
+  String get addAtLeastOnePhrase => _pick(
+    'Add at least one phrase',
+    'Добавьте хотя бы одну фразу',
+    'Añade al menos una frase',
+  );
+  String get recordedPhraseTextRequired => _pick(
+    'Enter text for the recorded phrase',
+    'Введите текст записанной фразы',
+    'Introduce texto para la frase grabada',
+  );
+  String get voiceSettings =>
+      _pick('Speech settings', 'Настройки речи', 'Ajustes de voz');
+  String get speechRate =>
+      _pick('Speech rate', 'Скорость речи', 'Velocidad del habla');
+  String get pitch => _pick('Pitch', 'Высота голоса', 'Tono');
+  String get volume => _pick('Volume', 'Громкость', 'Volumen');
+  String get testSound =>
+      _pick('Test sound', 'Проверить звучание', 'Probar sonido');
   String get installedVoices =>
-      _english ? 'Installed voices' : 'Установленные голоса';
-  String get voiceSelectionHint => _english
-      ? 'Choose several voices. If none are selected, the default Android voice is used.'
-      : 'Можно выбрать несколько. Если ничего не выбрано, используется голос Android по умолчанию.';
-  String get voiceFilter => _english ? 'Voice filter' : 'Фильтр голосов';
-  String get voiceFilterHint =>
-      _english ? 'For example, en or English' : 'Например, ru или Russian';
-  String get noVoices => _english
-      ? 'Android did not report any installed TTS voices. Check text-to-speech settings.'
-      : 'Android не сообщил об установленных TTS-голосах. Проверьте настройки синтеза речи.';
-  String get noFilteredVoices => _english
-      ? 'No voices match this filter.'
-      : 'По этому фильтру голоса не найдены.';
-  String get activity => _english ? 'Activity' : 'Активность';
-  String get previousMonth => _english ? 'Previous month' : 'Предыдущий месяц';
-  String get nextMonth => _english ? 'Next month' : 'Следующий месяц';
-  String get noHistory => _english
-      ? 'Training history is empty.\nIt will appear after the next training session.'
-      : 'История тренировок пока пуста.\nОна появится после следующей тренировки.';
-  String get noDayData => _english
-      ? 'No training data for this day.'
-      : 'Нет данных о тренировках за этот день.';
-  String statisticsFor(String date) =>
-      _english ? 'Statistics for $date' : 'Статистика за $date';
-  String sounds(int count) => _english ? '$count sounds' : '$count звуков';
-  String get parrotReplied => _english ? 'Parrot replied' : 'Попугай ответил';
-  String get trainingTime => _english ? 'Training time' : 'Время тренировки';
+      _pick('Installed voices', 'Установленные голоса', 'Voces instaladas');
+  String get voiceSelectionHint => _pick(
+    'Choose several voices. If none are selected, the default Android voice is used.',
+    'Можно выбрать несколько. Если ничего не выбрано, используется голос Android по умолчанию.',
+    'Puedes elegir varias voces. Si no seleccionas ninguna, se usará la voz predeterminada de Android.',
+  );
+  String get voiceFilter =>
+      _pick('Voice filter', 'Фильтр голосов', 'Filtro de voces');
+  String get voiceFilterHint => _pick(
+    'For example, en or English',
+    'Например, ru или Russian',
+    'Por ejemplo, es o español',
+  );
+  String get noVoices => _pick(
+    'Android did not report any installed TTS voices. Check text-to-speech settings.',
+    'Android не сообщил об установленных TTS-голосах. Проверьте настройки синтеза речи.',
+    'Android no informó de ninguna voz TTS instalada. Comprueba los ajustes de texto a voz.',
+  );
+  String get noFilteredVoices => _pick(
+    'No voices match this filter.',
+    'По этому фильтру голоса не найдены.',
+    'Ninguna voz coincide con este filtro.',
+  );
+  String get activity => _pick('Activity', 'Активность', 'Actividad');
+  String get previousMonth =>
+      _pick('Previous month', 'Предыдущий месяц', 'Mes anterior');
+  String get nextMonth =>
+      _pick('Next month', 'Следующий месяц', 'Mes siguiente');
+  String get noHistory => _pick(
+    'Training history is empty.\nIt will appear after the next training session.',
+    'История тренировок пока пуста.\nОна появится после следующей тренировки.',
+    'El historial de entrenamiento está vacío.\nAparecerá después de la próxima sesión de entrenamiento.',
+  );
+  String get noDayData => _pick(
+    'No training data for this day.',
+    'Нет данных о тренировках за этот день.',
+    'No hay datos de entrenamiento para este día.',
+  );
+  String statisticsFor(String date) => _pick(
+    'Statistics for $date',
+    'Статистика за $date',
+    'Estadísticas del $date',
+  );
+  String sounds(int count) =>
+      _pick('$count sounds', '$count звуков', '$count sonidos');
+  String get parrotReplied =>
+      _pick('Parrot replied', 'Попугай ответил', 'El loro respondió');
+  String get trainingTime =>
+      _pick('Training time', 'Время тренировки', 'Tiempo de entrenamiento');
   String get activityByTime =>
-      _english ? 'Activity by time' : 'Активность по времени';
-  String get trainingWithoutSounds =>
-      _english ? 'training without sounds' : 'тренировка без звуков';
-  String get noDataShort => _english ? 'no data' : 'нет данных';
-  String get activityOff => _english ? 'off' : 'выкл.';
+      _pick('Activity by time', 'Активность по времени', 'Actividad por hora');
+  String get trainingWithoutSounds => _pick(
+    'training without sounds',
+    'тренировка без звуков',
+    'entrenamiento sin sonidos',
+  );
+  String get noDataShort => _pick('no data', 'нет данных', 'sin datos');
+  String get activityOff => _pick('off', 'выкл.', 'apagado');
   String get activityRunningQuiet =>
-      _english ? 'running, quiet' : 'работала, тихо';
-  String get activityLegend => _english ? 'activity' : 'активность';
-  String get trainingRunningNoSounds => _english
-      ? 'Training is running, no sounds'
-      : 'Тренировка работала, звуков нет';
-  String get trainingStopped =>
-      _english ? 'Training is off' : 'Тренировка выключена';
-  List<String> get weekdays => _english
-      ? const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      : const ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  List<String> get months => _english
-      ? const [
-          'January',
-          'February',
-          'March',
-          'April',
-          'May',
-          'June',
-          'July',
-          'August',
-          'September',
-          'October',
-          'November',
-          'December',
-        ]
-      : const [
-          'Январь',
-          'Февраль',
-          'Март',
-          'Апрель',
-          'Май',
-          'Июнь',
-          'Июль',
-          'Август',
-          'Сентябрь',
-          'Октябрь',
-          'Ноябрь',
-          'Декабрь',
-        ];
+      _pick('running, quiet', 'работала, тихо', 'activo, en silencio');
+  String get activityLegend => _pick('activity', 'активность', 'actividad');
+  String get trainingRunningNoSounds => _pick(
+    'Training is running, no sounds',
+    'Тренировка работала, звуков нет',
+    'Entrenamiento activo, sin sonidos',
+  );
+  String get trainingStopped => _pick(
+    'Training is off',
+    'Тренировка выключена',
+    'Entrenamiento desactivado',
+  );
+  List<String> get weekdays => _pick(
+    const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    const ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+    const ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+  );
+  List<String> get months => _pick(
+    const [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ],
+    const [
+      'Январь',
+      'Февраль',
+      'Март',
+      'Апрель',
+      'Май',
+      'Июнь',
+      'Июль',
+      'Август',
+      'Сентябрь',
+      'Октябрь',
+      'Ноябрь',
+      'Декабрь',
+    ],
+    const [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ],
+  );
   String duration(int seconds) {
     final d = Duration(seconds: seconds);
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
-    return _english
-        ? (h > 0 ? '${h}h ${m}m' : '${m}m')
-        : (h > 0 ? '$h ч $m мин' : '$m мин');
+    return _pick(
+      h > 0 ? '${h}h ${m}m' : '${m}m',
+      h > 0 ? '$h ч $m мин' : '$m мин',
+      h > 0 ? '$h h $m min' : '$m min',
+    );
   }
 }
 

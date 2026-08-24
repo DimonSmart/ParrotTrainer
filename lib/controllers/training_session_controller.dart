@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../l10n/app_language.dart';
 import '../models/training_phrase.dart';
 import '../models/training_settings.dart';
 import '../models/training_statistics.dart';
@@ -117,22 +118,40 @@ class TrainingSessionController extends ChangeNotifier {
               .clamp(0, 1);
   }
 
-  bool get _english =>
-      PlatformDispatcher.instance.locale.languageCode.toLowerCase() == 'en';
+  String _localized(String english, String russian, String spanish) =>
+      switch (
+        AppLanguage.resolve(PlatformDispatcher.instance.locale.languageCode)
+      ) {
+        AppLanguage.english => english,
+        AppLanguage.russian => russian,
+        AppLanguage.spanish => spanish,
+      };
 
   String get stateLabel => switch (state) {
-    TrainingState.stopped =>
-      _english ? 'Training is off' : 'Программа выключена',
-    TrainingState.minimumInterval =>
-      _english ? 'Safety interval' : 'Защитный интервал',
-    TrainingState.listening => _english ? 'Listening' : 'Слушаю',
+    TrainingState.stopped => _localized(
+      'Training is off',
+      'Программа выключена',
+      'Entrenamiento desactivado',
+    ),
+    TrainingState.minimumInterval => _localized(
+      'Safety interval',
+      'Защитный интервал',
+      'Intervalo de seguridad',
+    ),
+    TrainingState.listening =>
+      _localized('Listening', 'Слушаю', 'Escuchando'),
     TrainingState.soundDetected =>
-      _english ? 'Parrot detected' : 'Слышу попугая',
-    TrainingState.waitingForSilence =>
-      _english ? 'Waiting for silence' : 'Жду тишины',
-    TrainingState.speaking => _english ? 'Speaking' : 'Говорю',
-    TrainingState.postSpeechGuard => _english ? 'Listening…' : 'Слушаю…',
-    TrainingState.quietPeriod => _english ? 'Quiet pause' : 'Тихая пауза',
+      _localized('Parrot detected', 'Слышу попугая', 'Loro detectado'),
+    TrainingState.waitingForSilence => _localized(
+      'Waiting for silence',
+      'Жду тишины',
+      'Esperando silencio',
+    ),
+    TrainingState.speaking => _localized('Speaking', 'Говорю', 'Hablando'),
+    TrainingState.postSpeechGuard =>
+      _localized('Listening…', 'Слушаю…', 'Escuchando…'),
+    TrainingState.quietPeriod =>
+      _localized('Quiet pause', 'Тихая пауза', 'Pausa silenciosa'),
   };
   void updateSettings(TrainingSettings value) {
     _settings = value;

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../l10n/app_language.dart';
 import '../models/training_settings.dart';
 
 class TtsVoice {
@@ -25,6 +26,9 @@ class AndroidTtsService implements TtsService {
   final FlutterTts _tts = FlutterTts();
   late final Future<void> _ready;
 
+  AppLanguage get _language =>
+      AppLanguage.resolve(PlatformDispatcher.instance.locale.languageCode);
+
   @override
   Future<List<TtsVoice>> getVoices() async {
     final raw = await _tts.getVoices;
@@ -39,10 +43,13 @@ class AndroidTtsService implements TtsService {
         )
         .where((voice) => voice.name.isNotEmpty)
         .toList();
+    final languageCode = _language.code;
     voices.sort((a, b) {
-      final aRu = a.locale.toLowerCase().startsWith('ru') ? 0 : 1;
-      final bRu = b.locale.toLowerCase().startsWith('ru') ? 0 : 1;
-      return aRu != bRu ? aRu.compareTo(bRu) : a.name.compareTo(b.name);
+      final aPreferred = a.locale.toLowerCase().startsWith(languageCode) ? 0 : 1;
+      final bPreferred = b.locale.toLowerCase().startsWith(languageCode) ? 0 : 1;
+      return aPreferred != bPreferred
+          ? aPreferred.compareTo(bPreferred)
+          : a.name.compareTo(b.name);
     });
     return voices;
   }
@@ -55,9 +62,11 @@ class AndroidTtsService implements TtsService {
   ) async {
     await _ready;
     await _tts.setLanguage(
-      PlatformDispatcher.instance.locale.languageCode == 'en'
-          ? 'en-US'
-          : 'ru-RU',
+      switch (_language) {
+        AppLanguage.english => 'en-US',
+        AppLanguage.russian => 'ru-RU',
+        AppLanguage.spanish => 'es-ES',
+      },
     );
     if (voice != null) await _tts.setVoice(voice.platformValue);
     await _tts.setSpeechRate(settings.speechRate);

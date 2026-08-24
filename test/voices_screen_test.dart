@@ -16,7 +16,10 @@ void main() {
     ];
 
     await tester.pumpWidget(
-      MaterialApp(home: VoicesScreen(controller: controller)),
+      MaterialApp(
+        locale: const Locale('ru'),
+        home: VoicesScreen(controller: controller),
+      ),
     );
 
     await tester.enterText(find.byKey(const Key('voiceFilter')), 'RU');

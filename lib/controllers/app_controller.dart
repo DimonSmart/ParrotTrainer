@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../l10n/app_language.dart';
 import '../models/training_settings.dart';
 import '../models/training_statistics.dart';
 import '../models/activity_history.dart';
@@ -316,10 +317,13 @@ class AppController extends ChangeNotifier {
     await tts.speak(_previewPhrase, settings, null);
   }
 
-  String get _previewPhrase =>
-      PlatformDispatcher.instance.locale.languageCode == 'en'
-      ? 'Good bird!'
-      : 'Привет, моя птичка';
+  String get _previewPhrase => switch (
+    AppLanguage.resolve(PlatformDispatcher.instance.locale.languageCode)
+  ) {
+    AppLanguage.english => 'Good bird!',
+    AppLanguage.russian => 'Привет, моя птичка',
+    AppLanguage.spanish => '¡Buen pajarito!',
+  };
 
   @override
   void dispose() {

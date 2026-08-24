@@ -33,11 +33,15 @@ class TrainingBackgroundService : Service() {
 
     private fun startForegroundWithNotification() {
         val channelId = "training_background"
-        val english = isEnglish()
+        val language = currentLanguage()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                if (english) "Parrot training" else "Обучение попугая",
+                when (language) {
+                    "ru" -> "Обучение попугая"
+                    "es" -> "Entrenamiento del loro"
+                    else -> "Parrot training"
+                },
                 NotificationManager.IMPORTANCE_LOW,
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -50,13 +54,17 @@ class TrainingBackgroundService : Service() {
         val notification = notificationBuilder
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(
-                if (english) "Parrot Trainer is running" else "Parrot Trainer работает",
+                when (language) {
+                    "ru" -> "Parrot Trainer работает"
+                    "es" -> "Parrot Trainer está activo"
+                    else -> "Parrot Trainer is running"
+                },
             )
             .setContentText(
-                if (english) {
-                    "Training continues while the screen is off"
-                } else {
-                    "Обучение продолжается при выключенном экране"
+                when (language) {
+                    "ru" -> "Обучение продолжается при выключенном экране"
+                    "es" -> "El entrenamiento continúa con la pantalla apagada"
+                    else -> "Training continues while the screen is off"
                 },
             )
             .setOngoing(true)
@@ -69,13 +77,16 @@ class TrainingBackgroundService : Service() {
     }
 
     @Suppress("DEPRECATION")
-    private fun isEnglish(): Boolean {
+    private fun currentLanguage(): String {
         val language = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             resources.configuration.locales[0].language
         } else {
             resources.configuration.locale.language
         }
-        return language.equals("en", ignoreCase = true)
+        return when (language.lowercase()) {
+            "ru", "es" -> language.lowercase()
+            else -> "en"
+        }
     }
 
     companion object {
