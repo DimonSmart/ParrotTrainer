@@ -1,3 +1,5 @@
+import 'daily_time_grid.dart';
+
 class ActivityBucket {
   const ActivityBucket({
     this.activeSeconds = 0,
@@ -69,9 +71,9 @@ class DailyActivity {
   final DateTime date;
   final Map<int, ActivityBucket> buckets;
 
-  static int bucketIndex(DateTime value) => value.hour * 4 + value.minute ~/ 15;
+  static int bucketIndex(DateTime value) => DailyTimeGrid.slotIndex(value);
   static DateTime bucketStart(DateTime day, int index) =>
-      DateTime(day.year, day.month, day.day, index ~/ 4, (index % 4) * 15);
+      DailyTimeGrid.slotStart(day, index);
   String get dateKey =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   ActivityBucket get total =>
@@ -92,7 +94,9 @@ class DailyActivity {
   bool get hasData => buckets.isNotEmpty;
 
   DailyActivity addToBucket(int index, ActivityBucket value) {
-    if (index < 0 || index > 95 || !value.hasData) return this;
+    if (index < 0 || index >= DailyTimeGrid.slotCount || !value.hasData) {
+      return this;
+    }
     final copy = Map<int, ActivityBucket>.from(buckets);
     copy[index] = (copy[index] ?? const ActivityBucket()).add(value);
     return DailyActivity(date: date, buckets: copy);
@@ -115,7 +119,10 @@ class DailyActivity {
     final buckets = <int, ActivityBucket>{};
     rawBuckets.forEach((key, value) {
       final index = int.tryParse(key.toString());
-      if (index != null && index >= 0 && index < 96 && value is Map) {
+      if (index != null &&
+          index >= 0 &&
+          index < DailyTimeGrid.slotCount &&
+          value is Map) {
         final bucket = ActivityBucket.fromJson(
           Map<String, dynamic>.from(value),
         );

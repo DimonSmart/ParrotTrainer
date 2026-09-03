@@ -1,18 +1,19 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../controllers/app_controller.dart';
 import '../controllers/training_session_controller.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../models/training_phrase.dart';
 import '../services/sound_detector.dart';
-import 'phrase_editor_screen.dart';
-import 'voices_screen.dart';
-import 'privacy_policy_screen.dart';
 import 'activity_history_screen.dart';
-import '../l10n/generated/app_localizations.dart';
-import '../l10n/app_strings.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'phrase_editor_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'schedule_mask_editor.dart';
+import 'voices_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.controller});
@@ -104,12 +105,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _toggleTraining(bool enabled) async {
     if (!enabled) {
       await controller.stopTraining();
-      return;
-    }
-    if (!controller.settings.isWithinScheduledHours(DateTime.now())) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.strings.outsideSchedule)));
       return;
     }
     final started = await controller.startTraining();
@@ -456,7 +451,7 @@ class _IntervalsCard extends StatelessWidget {
                   children: [
                     Text(
                       context.strings.startConversation,
-                      style: TextStyle(fontSize: 16),
+                      style: const TextStyle(fontSize: 16),
                     ),
                     Text(
                       '${settings.idlePromptMinInterval.inSeconds}–${settings.idlePromptMaxInterval.inSeconds} ${context.strings.seconds}',
@@ -525,30 +520,21 @@ class _ScheduleCard extends StatelessWidget {
 
   final AppController controller;
 
-  Future<void> _pickTime(BuildContext context, bool start) async {
-    final settings = controller.settings;
-    final minute = start
-        ? settings.scheduleStartMinute
-        : settings.scheduleEndMinute;
-    final selected = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
-    );
-    if (selected == null) return;
-    final value = selected.hour * 60 + selected.minute;
-    await controller.updateSettings(
-      settings.copyWith(
-        scheduleStartMinute: start ? value : null,
-        scheduleEndMinute: start ? null : value,
-      ),
-    );
-  }
+  String _description(BuildContext context) => switch (
+    Localizations.localeOf(context).languageCode
+  ) {
+    'ru' => 'Выберите 15-минутные интервалы, когда программа может тренировать попугая.',
+    'es' => 'Selecciona los intervalos de 15 minutos en los que se permite entrenar.',
+    _ => 'Select the 15-minute intervals when training is allowed.',
+  };
 
-  String _format(BuildContext context, int minute) =>
-      MaterialLocalizations.of(context).formatTimeOfDay(
-        TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
-        alwaysUse24HourFormat: true,
-      );
+  String _hint(BuildContext context) => switch (
+    Localizations.localeOf(context).languageCode
+  ) {
+    'ru' => 'Коснитесь или проведите пальцем по клеткам.',
+    'es' => 'Toca o arrastra el dedo por las celdas.',
+    _ => 'Tap or drag across the cells.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -556,29 +542,32 @@ class _ScheduleCard extends StatelessWidget {
     return _SectionCard(
       title: context.strings.schedule,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(context.strings.followSchedule),
-            subtitle: Text(context.strings.scheduleDescription),
+            subtitle: Text(_description(context)),
             value: settings.dailyScheduleEnabled,
             onChanged: (value) => controller.updateSettings(
               settings.copyWith(dailyScheduleEnabled: value),
             ),
           ),
           if (settings.dailyScheduleEnabled) ...[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.strings.start),
-              trailing: Text(_format(context, settings.scheduleStartMinute)),
-              onTap: () => _pickTime(context, true),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _hint(context),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.strings.end),
-              trailing: Text(_format(context, settings.scheduleEndMinute)),
-              onTap: () => _pickTime(context, false),
+            ScheduleMaskEditor(
+              mask: settings.dailySchedule,
+              onChanged: (mask) => controller.updateSettings(
+                controller.settings.copyWith(dailySchedule: mask),
+              ),
             ),
+            const SizedBox(height: 8),
           ],
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -780,18 +769,22 @@ class _StartPanel extends StatelessWidget {
   final ValueChanged<bool> onToggle;
   @override
   Widget build(BuildContext context) {
+    final enabled = controller.trainingEnabled;
     final running = controller.session.isRunning;
     final progress = controller.session.nextSpeechProgress;
     final remaining = controller.session.timeUntilNextSpeech;
+    final stateLabel = controller.isWaitingForSchedule
+        ? context.strings.outsideSchedule
+        : controller.session.stateLabel;
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(14, 6, 14, 10),
       child: Material(
-        color: running ? const Color(0xFF318E2D) : Colors.grey.shade700,
+        color: enabled ? const Color(0xFF318E2D) : Colors.grey.shade700,
         borderRadius: BorderRadius.circular(24),
         elevation: 8,
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () => onToggle(!running),
+          onTap: () => onToggle(!enabled),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 10, 10),
             child: Column(
@@ -810,7 +803,7 @@ class _StartPanel extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            running
+                            enabled
                                 ? context.strings.programOn
                                 : context.strings.programOff,
                             style: const TextStyle(
@@ -820,14 +813,14 @@ class _StartPanel extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            controller.session.stateLabel,
+                            stateLabel,
                             style: const TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
                     ),
                     Switch(
-                      value: running,
+                      value: enabled,
                       onChanged: onToggle,
                       activeThumbColor: Colors.white,
                       activeTrackColor: Colors.lightGreenAccent.shade700,
