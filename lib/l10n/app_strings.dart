@@ -38,8 +38,8 @@ class AppStrings {
   String get followSchedule =>
       _english ? 'Follow a schedule' : 'Работать по расписанию';
   String get scheduleDescription => _english
-      ? 'Training stops outside these hours'
-      : 'Вне этого времени тренировка выключается';
+      ? 'Training pauses outside these hours and resumes automatically while the program is on'
+      : 'Вне этого времени тренировка приостанавливается и возобновляется автоматически';
   String get start => _english ? 'Start' : 'Начало';
   String get end => _english ? 'End' : 'Окончание';
   String get allowScreenSleep =>

@@ -45,15 +45,18 @@ class AppController extends ChangeNotifier {
   List<TtsVoice> voices = [];
   bool initialized = false;
   bool microphoneAvailable = true;
+  bool trainingEnabled = false;
   double currentLevelDb = -80;
   bool calibrating = false;
   int calibrationSecondsLeft = 0;
   final List<double> _calibrationSamples = [];
   DateTime? _calibrationStartedAt;
   bool _microphoneCaptureSuspended = false;
+  bool _appInForeground = true;
   Timer? _scheduleTimer;
-  Timer? _scheduleEndTimer;
+  Timer? _scheduleTransitionTimer;
   Timer? _activityCheckpointTimer;
+  Future<void> _pendingScheduleSync = Future.value();
   late final ActivityHistoryTracker _activityHistory;
   TrainingStatistics? _lastRecordedStatistics;
 
@@ -116,7 +119,7 @@ class AppController extends ChangeNotifier {
     initialized = true;
     _scheduleTimer = Timer.periodic(
       const Duration(seconds: 30),
-      (_) => unawaited(_enforceSchedule()),
+      (_) => unawaited(_syncTrainingWithSchedule()),
     );
     notifyListeners();
   }
@@ -130,31 +133,31 @@ class AppController extends ChangeNotifier {
     settings = value;
     session.updateSettings(value);
     await _settingsRepository.save(value);
-    if (session.isRunning && !settings.isWithinScheduledHours(DateTime.now())) {
-      await stopTraining();
-    } else {
-      await _syncPowerMode();
-      _scheduleStopAtEnd();
-    }
-    notifyListeners();
+    await _syncTrainingWithSchedule();
   }
 
   Future<bool> startTraining() async {
-    if (!settings.isWithinScheduledHours(DateTime.now())) {
-      notifyListeners();
+    trainingEnabled = true;
+    notifyListeners();
+    final shouldRun = _shouldTrainingRunNow();
+    await _syncTrainingWithSchedule();
+    if (shouldRun && !session.isRunning) {
+      trainingEnabled = false;
+      await _syncTrainingWithSchedule();
       return false;
     }
-    if (!microphoneAvailable) {
-      try {
-        microphoneAvailable = await _audio.start();
-      } catch (_) {
-        microphoneAvailable = false;
-      }
-    }
-    if (!microphoneAvailable) {
-      notifyListeners();
-      return false;
-    }
+    return true;
+  }
+
+  Future<void> stopTraining() async {
+    trainingEnabled = false;
+    await _syncTrainingWithSchedule();
+  }
+
+  Future<bool> _startActiveTraining() async {
+    if (session.isRunning) return true;
+    await _startAudioCapture();
+    if (!microphoneAvailable) return false;
     final now = DateTime.now();
     _activityHistory.start(now);
     session.start();
@@ -165,12 +168,10 @@ class AppController extends ChangeNotifier {
         unawaited(_activityHistory.checkpoint(DateTime.now()));
       }
     });
-    await _syncPowerMode();
-    _scheduleStopAtEnd();
     return true;
   }
 
-  Future<void> stopTraining() async {
+  Future<void> _stopActiveTraining() async {
     try {
       if (session.isRunning) {
         await _activityHistory.stop(DateTime.now());
@@ -179,32 +180,32 @@ class AppController extends ChangeNotifier {
     } finally {
       _activityCheckpointTimer?.cancel();
       _activityCheckpointTimer = null;
-      _scheduleEndTimer?.cancel();
-      _scheduleEndTimer = null;
-      await _syncPowerMode();
     }
   }
 
   Future<void> pauseForBackground() async {
-    if (session.isRunning && settings.allowScreenToSleep) return;
-    await stopTraining();
-    await _audio.stop();
+    _appInForeground = false;
+    await _syncTrainingWithSchedule();
+    if (!session.isRunning) await _audio.stop();
   }
 
   Future<void> resumeForeground() async {
+    _appInForeground = true;
     if (_microphoneCaptureSuspended) return;
     await _startAudioCapture();
+    await _syncTrainingWithSchedule();
   }
 
   Future<void> suspendMicrophoneCapture() async {
     _microphoneCaptureSuspended = true;
-    await stopTraining();
+    await _syncTrainingWithSchedule();
     await _audio.stop();
   }
 
   Future<void> resumeMicrophoneCapture() async {
     _microphoneCaptureSuspended = false;
     await _startAudioCapture();
+    await _syncTrainingWithSchedule();
   }
 
   Future<void> _startAudioCapture() async {
@@ -223,31 +224,54 @@ class AppController extends ChangeNotifier {
     await _startAudioCapture();
   }
 
-  Future<void> _enforceSchedule() async {
-    if (session.isRunning && !settings.isWithinScheduledHours(DateTime.now())) {
-      await stopTraining();
-    }
+  bool _shouldTrainingRunNow() =>
+      trainingEnabled &&
+      !_microphoneCaptureSuspended &&
+      settings.isWithinScheduledHours(DateTime.now()) &&
+      (_appInForeground || settings.allowScreenToSleep);
+
+  Future<void> _syncTrainingWithSchedule() {
+    final result = _pendingScheduleSync.then((_) => _performScheduleSync());
+    _pendingScheduleSync = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
   }
 
-  void _scheduleStopAtEnd() {
-    _scheduleEndTimer?.cancel();
-    if (!session.isRunning ||
+  Future<void> _performScheduleSync() async {
+    if (_shouldTrainingRunNow()) {
+      await _startActiveTraining();
+    } else if (session.isRunning) {
+      await _stopActiveTraining();
+    }
+    await _syncPowerMode();
+    _scheduleNextTransition();
+    notifyListeners();
+  }
+
+  void _scheduleNextTransition() {
+    _scheduleTransitionTimer?.cancel();
+    if (!trainingEnabled ||
         !settings.dailyScheduleEnabled ||
         settings.scheduleStartMinute == settings.scheduleEndMinute) {
       return;
     }
     final now = DateTime.now();
-    var end = DateTime(
+    final withinSchedule = settings.isWithinScheduledHours(now);
+    final transitionMinute = withinSchedule
+        ? settings.scheduleEndMinute
+        : settings.scheduleStartMinute;
+    var transition = DateTime(
       now.year,
       now.month,
       now.day,
-      settings.scheduleEndMinute ~/ 60,
-      settings.scheduleEndMinute % 60,
+      transitionMinute ~/ 60,
+      transitionMinute % 60,
     );
-    if (!end.isAfter(now)) end = end.add(const Duration(days: 1));
-    _scheduleEndTimer = Timer(
-      end.difference(now),
-      () => unawaited(stopTraining()),
+    if (!transition.isAfter(now)) {
+      transition = transition.add(const Duration(days: 1));
+    }
+    _scheduleTransitionTimer = Timer(
+      transition.difference(now),
+      () => unawaited(_syncTrainingWithSchedule()),
     );
   }
 
@@ -255,7 +279,7 @@ class AppController extends ChangeNotifier {
     final running = session.isRunning;
     await _keepScreenOn.setEnabled(running && !settings.allowScreenToSleep);
     await _keepScreenOn.setBackgroundTrainingEnabled(
-      running && settings.allowScreenToSleep,
+      trainingEnabled && settings.allowScreenToSleep,
     );
   }
 
@@ -326,7 +350,7 @@ class AppController extends ChangeNotifier {
     session.removeListener(_sessionChanged);
     session.dispose();
     _scheduleTimer?.cancel();
-    _scheduleEndTimer?.cancel();
+    _scheduleTransitionTimer?.cancel();
     _activityCheckpointTimer?.cancel();
     _levelSubscription?.cancel();
     unawaited(_keepScreenOn.setEnabled(false));

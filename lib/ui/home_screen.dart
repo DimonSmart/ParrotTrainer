@@ -106,12 +106,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await controller.stopTraining();
       return;
     }
-    if (!controller.settings.isWithinScheduledHours(DateTime.now())) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.strings.outsideSchedule)));
-      return;
-    }
     final started = await controller.startTraining();
     if (!started && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -410,7 +404,7 @@ class _LevelMeter extends StatelessWidget {
             ),
           ),
         ],
-      );
+      ),
     },
   );
 }
@@ -780,18 +774,24 @@ class _StartPanel extends StatelessWidget {
   final ValueChanged<bool> onToggle;
   @override
   Widget build(BuildContext context) {
+    final enabled = controller.trainingEnabled;
     final running = controller.session.isRunning;
+    final waitingForSchedule =
+        enabled &&
+        !running &&
+        controller.settings.dailyScheduleEnabled &&
+        !controller.settings.isWithinScheduledHours(DateTime.now());
     final progress = controller.session.nextSpeechProgress;
     final remaining = controller.session.timeUntilNextSpeech;
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(14, 6, 14, 10),
       child: Material(
-        color: running ? const Color(0xFF318E2D) : Colors.grey.shade700,
+        color: enabled ? const Color(0xFF318E2D) : Colors.grey.shade700,
         borderRadius: BorderRadius.circular(24),
         elevation: 8,
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () => onToggle(!running),
+          onTap: () => onToggle(!enabled),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 10, 10),
             child: Column(
@@ -800,7 +800,11 @@ class _StartPanel extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      running ? Icons.graphic_eq : Icons.mic_off,
+                      running
+                          ? Icons.graphic_eq
+                          : enabled
+                          ? Icons.schedule
+                          : Icons.mic_off,
                       color: Colors.white,
                     ),
                     const SizedBox(width: 12),
@@ -810,7 +814,7 @@ class _StartPanel extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            running
+                            enabled
                                 ? context.strings.programOn
                                 : context.strings.programOff,
                             style: const TextStyle(
@@ -820,14 +824,16 @@ class _StartPanel extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            controller.session.stateLabel,
+                            waitingForSchedule
+                                ? context.strings.outsideSchedule
+                                : controller.session.stateLabel,
                             style: const TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
                     ),
                     Switch(
-                      value: running,
+                      value: enabled,
                       onChanged: onToggle,
                       activeThumbColor: Colors.white,
                       activeTrackColor: Colors.lightGreenAccent.shade700,

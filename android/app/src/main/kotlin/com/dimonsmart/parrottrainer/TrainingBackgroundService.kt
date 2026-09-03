@@ -49,7 +49,7 @@ class TrainingBackgroundService : Service() {
         val notification = notificationBuilder
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Parrot Trainer работает")
-            .setContentText("Обучение продолжается при выключенном экране")
+            .setContentText("Программа работает в фоне по установленному расписанию")
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
