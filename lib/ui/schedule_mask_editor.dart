@@ -85,6 +85,14 @@ class _ScheduleMaskEditorState extends State<ScheduleMaskEditor> {
     if (changed) setState(() {});
   }
 
+  void _startPan(DragStartDetails details) {
+    final start = _downPosition ?? details.localPosition;
+    _beginStroke(start);
+    if (details.localPosition != start) {
+      _continueStroke(details.localPosition);
+    }
+  }
+
   void _finishStroke() {
     if (_paintState == null) return;
     final shouldNotify = _changed;
@@ -155,9 +163,7 @@ class _ScheduleMaskEditorState extends State<ScheduleMaskEditor> {
                     key: const Key('schedule-grid-gesture-area'),
                     behavior: HitTestBehavior.opaque,
                     onPanDown: (details) => _downPosition = details.localPosition,
-                    onPanStart: (details) => _beginStroke(
-                      _downPosition ?? details.localPosition,
-                    ),
+                    onPanStart: _startPan,
                     onPanUpdate: (details) =>
                         _continueStroke(details.localPosition),
                     onPanEnd: (_) => _finishStroke(),

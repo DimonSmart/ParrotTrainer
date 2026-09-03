@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:record/record.dart';
 
 class AudioLevelService {
-  final AudioRecorder _recorder = AudioRecorder();
+  AudioLevelService({AudioRecorder? recorder}) : _recorder = recorder;
+
+  AudioRecorder? _recorder;
   StreamSubscription<dynamic>? _audioSubscription;
   StreamSubscription<Amplitude>? _amplitudeSubscription;
   final _levels = StreamController<double>.broadcast();
@@ -12,12 +14,15 @@ class AudioLevelService {
   Stream<double> get levels => _levels.stream;
   bool _running = false;
 
+  AudioRecorder get _deviceRecorder => _recorder ??= AudioRecorder();
+
   Future<bool> start() => _enqueue(_start);
 
   Future<bool> _start() async {
     if (_running) return true;
-    if (!await _recorder.hasPermission()) return false;
-    final stream = await _recorder.startStream(
+    final recorder = _deviceRecorder;
+    if (!await recorder.hasPermission()) return false;
+    final stream = await recorder.startStream(
       const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
@@ -26,7 +31,7 @@ class AudioLevelService {
       ),
     );
     _audioSubscription = stream.listen((_) {});
-    _amplitudeSubscription = _recorder
+    _amplitudeSubscription = recorder
         .onAmplitudeChanged(const Duration(milliseconds: 80))
         .listen((amplitude) => _levels.add(amplitude.current));
     _running = true;
@@ -41,7 +46,7 @@ class AudioLevelService {
     await _audioSubscription?.cancel();
     _amplitudeSubscription = null;
     _audioSubscription = null;
-    await _recorder.stop();
+    await _recorder?.stop();
     _running = false;
   }
 
@@ -54,6 +59,6 @@ class AudioLevelService {
   Future<void> dispose() async {
     await stop();
     await _levels.close();
-    await _recorder.dispose();
+    await _recorder?.dispose();
   }
 }

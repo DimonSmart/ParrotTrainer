@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:parrot_trainer/controllers/app_controller.dart';
+import 'package:parrot_trainer/l10n/generated/app_localizations.dart';
 import 'package:parrot_trainer/models/training_settings.dart';
 import 'package:parrot_trainer/services/tts_service.dart';
 import 'package:parrot_trainer/ui/voices_screen.dart';
@@ -18,6 +20,13 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('ru'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         home: VoicesScreen(controller: controller),
       ),
     );

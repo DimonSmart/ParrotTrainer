@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:parrot_trainer/l10n/generated/app_localizations.dart';
 import 'package:parrot_trainer/models/training_phrase.dart';
 import 'package:parrot_trainer/services/phrase_recorder.dart';
 import 'package:parrot_trainer/services/recorded_phrase_player.dart';
@@ -225,6 +227,13 @@ Future<_EditorFixture> _pumpEditor(
   await tester.pumpWidget(
     MaterialApp(
       locale: const Locale('ru'),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       home: PhraseEditorScreen(
         phrases: phrases,
         recorder: fixture.recorder,

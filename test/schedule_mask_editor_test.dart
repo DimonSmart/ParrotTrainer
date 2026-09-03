@@ -12,7 +12,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(width: 420, child: harness.build()),
+          body: SingleChildScrollView(
+            child: SizedBox(width: 420, child: harness.build()),
+          ),
         ),
       ),
     );
