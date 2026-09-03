@@ -404,7 +404,7 @@ class _LevelMeter extends StatelessWidget {
             ),
           ),
         ],
-      ),
+      );
     },
   );
 }
