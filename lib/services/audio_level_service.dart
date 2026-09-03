@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:record/record.dart';
 
 class AudioLevelService {
-  AudioLevelService({AudioRecorder? recorder}) : _recorder = recorder;
+  AudioLevelService({this._recorder});
 
   AudioRecorder? _recorder;
   StreamSubscription<dynamic>? _audioSubscription;
