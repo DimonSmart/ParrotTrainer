@@ -93,6 +93,59 @@ void main() {
     expect(controller.session.isRunning, isFalse);
   });
 
+  for (final allowSleep in [false, true]) {
+    testWidgets('timer starts and stops capture; allow sleep: $allowSleep', (
+      tester,
+    ) async {
+      var now = DateTime(2026, 1, 1, 8, 14, 59);
+      final audio = _AudioService();
+      final power = _KeepScreenOnService();
+      final controller = AppController(
+        settingsRepository: _SettingsRepository(
+          TrainingSettings.defaults.copyWith(
+            dailyScheduleEnabled: true,
+            dailySchedule: DailyScheduleMask.allOff.withSlot(33, true),
+            allowScreenToSleep: allowSleep,
+          ),
+        ),
+        statisticsRepository: _StatisticsRepository(),
+        activityHistoryRepository: _ActivityRepository(),
+        audio: audio,
+        tts: _TtsService(),
+        keepScreenOn: power,
+        now: () => now,
+      );
+      try {
+        await controller.initialize();
+        await controller.startTraining();
+        await controller.pauseForBackground();
+        expect(audio.running, isFalse);
+        expect(power.backgroundEnabled, isTrue);
+        now = DateTime(2026, 1, 1, 8, 15);
+        await tester.pump(const Duration(seconds: 1));
+        expect(controller.session.isRunning, isTrue);
+        expect(audio.running, isTrue);
+        expect(power.screenEnabled, !allowSleep);
+
+        // The periodic fallback notices a wall-clock jump and re-arms
+        // the exact transition timer for the next second.
+        now = DateTime(2026, 1, 1, 8, 29, 59);
+        await tester.pump(const Duration(seconds: 29));
+        now = DateTime(2026, 1, 1, 8, 30);
+        await tester.pump(const Duration(seconds: 1));
+        expect(controller.session.isRunning, isFalse);
+        expect(audio.running, isFalse);
+        expect(controller.currentLevelDb, -80);
+        expect(power.screenEnabled, isFalse);
+        expect(power.backgroundEnabled, isTrue);
+        await controller.stopTraining();
+        expect(power.backgroundEnabled, isFalse);
+      } finally {
+        controller.dispose();
+      }
+    });
+  }
+
   test('changing the current slot synchronizes once without disabling trainer', () async {
     final now = DateTime(2026, 1, 1, 10, 5);
     final repository = _SettingsRepository(

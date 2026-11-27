@@ -14,6 +14,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var screenWakeLock: PowerManager.WakeLock? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "parrot_trainer/screen")
@@ -32,9 +33,12 @@ class MainActivity : FlutterActivity() {
                 }
                 if (call.argument<Boolean>("enabled") == true) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) setTurnScreenOn(true)
                     wakeScreenIfNeeded()
                 } else {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) setTurnScreenOn(false)
+                    releaseScreenWakeLock()
                 }
                 result.success(null)
             }
@@ -80,12 +84,23 @@ class MainActivity : FlutterActivity() {
         if (!power.isInteractive) {
             // Wake the display, without dismissing the user's lock screen.
             runCatching {
-                power.newWakeLock(
+                releaseScreenWakeLock()
+                screenWakeLock = power.newWakeLock(
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
                     "$packageName:scheduled-screen",
-                ).acquire(10_000L)
+                ).apply { acquire(10_000L) }
             }
         }
+    }
+
+    private fun releaseScreenWakeLock() {
+        screenWakeLock?.let { if (it.isHeld) it.release() }
+        screenWakeLock = null
+    }
+
+    override fun onDestroy() {
+        releaseScreenWakeLock()
+        super.onDestroy()
     }
 
     private fun convertWavToM4a(sourcePath: String, destinationPath: String) {

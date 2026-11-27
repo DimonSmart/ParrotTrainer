@@ -70,11 +70,15 @@ class AppController extends ChangeNotifier {
       settings.allowScreenToSleep || settings.dailyScheduleEnabled;
 
   bool get _captureAllowed =>
+      !_disposed &&
       !_microphoneCaptureSuspended &&
       !_speechCaptureSuspended &&
       !_previewing &&
       (!_lifecyclePaused || (trainingEnabled && _canRunInBackground)) &&
       settings.isTrainingAllowedAt(_now());
+
+  bool get canCalibrateMicrophone => !calibrating && _captureAllowed;
+
   Timer? _scheduleTimer;
   Timer? _scheduleTransitionTimer;
   Timer? _activityCheckpointTimer;
@@ -161,20 +165,18 @@ class AppController extends ChangeNotifier {
 
   Future<void> updateSettings(TrainingSettings value) async {
     settings = value;
-    if (settings.isTrainingAllowedAt(_now())) {
-      session.updateSettings(value);
+    if (!settings.isTrainingAllowedAt(_now()) && session.isRunning) {
+      await _synchronizeTrainingWithSchedule();
     }
+    session.updateSettings(settings);
     await _settingsRepository.save(value);
     await _synchronizeTrainingWithSchedule();
-    if (!settings.isTrainingAllowedAt(_now())) {
-      session.updateSettings(settings);
-    }
   }
 
   Future<bool> startTraining() async {
     trainingEnabled = true;
     final allowed = settings.isTrainingAllowedAt(_now());
-    if (!allowed && !microphoneAvailable) {
+    if (!microphoneAvailable) {
       try {
         microphoneAvailable = await _audio.checkPermission();
       } catch (_) {
@@ -230,6 +232,15 @@ class AppController extends ChangeNotifier {
     await _synchronizeTrainingWithSchedule();
   }
 
+  Future<void> retryMicrophone() async {
+    try {
+      microphoneAvailable = await _audio.checkPermission();
+    } catch (_) {
+      microphoneAvailable = false;
+    }
+    await _synchronizeTrainingWithSchedule();
+  }
+
   Future<void> suspendMicrophoneCapture() async {
     _microphoneCaptureSuspended = true;
     await _synchronizeTrainingWithSchedule();
@@ -241,7 +252,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _startAudioCapture() async {
-    if (_audioCaptureActive || !_captureAllowed) return;
+    if (_audioCaptureActive || !_captureAllowed || !microphoneAvailable) return;
     try {
       microphoneAvailable = await _audio.start();
       _audioCaptureActive = microphoneAvailable;
@@ -288,8 +299,13 @@ class AppController extends ChangeNotifier {
         settings.isTrainingAllowedAt(_now());
 
     if (!shouldRun && session.isRunning) {
-      await _stopActiveSession();
+      if (!_captureAllowed) {
+        await Future.wait([_stopActiveSession(), _stopAudioCapture()]);
+      } else {
+        await _stopActiveSession();
+      }
     }
+    if (_disposed) return;
     if (!_captureAllowed) {
       if (calibrating) _calibrationInterrupted = true;
       await _stopAudioCapture();
@@ -299,6 +315,7 @@ class AppController extends ChangeNotifier {
     if (shouldRun && !session.isRunning && _captureAllowed && trainingEnabled) {
       await _startActiveSession();
     }
+    if (_disposed) return;
     await _syncPowerMode();
     if (_disposed) return;
     _scheduleNextTransition();
@@ -308,7 +325,10 @@ class AppController extends ChangeNotifier {
   void _scheduleNextTransition() {
     _scheduleTransitionTimer?.cancel();
     _scheduleTransitionTimer = null;
-    if (!trainingEnabled || !settings.dailyScheduleEnabled) return;
+    if (!settings.dailyScheduleEnabled ||
+        (_lifecyclePaused && !trainingEnabled)) {
+      return;
+    }
 
     final now = _now();
     final transition = settings.dailySchedule.nextTransitionAfter(now);
@@ -328,7 +348,9 @@ class AppController extends ChangeNotifier {
         microphoneAvailable &&
         !_microphoneCaptureSuspended &&
         (!_lifecyclePaused || _canRunInBackground) &&
-        (settings.dailyScheduleEnabled ||
+        ((settings.dailyScheduleEnabled &&
+                (!settings.dailySchedule.isUniform ||
+                    settings.isTrainingAllowedAt(_now()))) ||
             (running && settings.allowScreenToSleep));
 
     if (_backgroundEnabled != backgroundEnabled) {
@@ -360,7 +382,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> calibrateMicrophone() async {
-    if (calibrating || !_captureAllowed) return;
+    if (!canCalibrateMicrophone) return;
     calibrating = true;
     _calibrationInterrupted = false;
     await _synchronizeTrainingWithSchedule();
@@ -375,6 +397,8 @@ class AppController extends ChangeNotifier {
       calibrationSecondsLeft = remaining;
       notifyListeners();
       await Future<void>.delayed(const Duration(seconds: 1));
+      if (_disposed) return;
+      if (_calibrationInterrupted || !_captureAllowed) break;
     }
     final threshold = MicrophoneCalibration.threshold(
       samples: _calibrationSamples,
