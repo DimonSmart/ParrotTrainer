@@ -16,6 +16,8 @@ class AudioLevelService {
 
   AudioRecorder get _deviceRecorder => _recorder ??= AudioRecorder();
 
+  Future<bool> checkPermission() => _deviceRecorder.hasPermission();
+
   Future<bool> start() => _enqueue(_start);
 
   Future<bool> _start() async {

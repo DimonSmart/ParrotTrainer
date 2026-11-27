@@ -328,9 +328,11 @@ class TrainingSessionController extends ChangeNotifier {
     _previousVoiceId = voice?.id;
     try {
       await microphoneCapture?.pause();
+      if (!_running || operation != _operation) return;
       final played = await _recordedPlayer.playIfAvailable(
         phrase.recordedAudioPath,
       );
+      if (!_running || operation != _operation) return;
       if (!played) await _tts.speak(phrase.text, _settings, voice);
       if (!_running || operation != _operation) return;
       _statistics = _statistics.copyWith(
@@ -343,13 +345,17 @@ class TrainingSessionController extends ChangeNotifier {
         birdReplyOpportunities: _statistics.birdReplyOpportunities + 1,
       );
       await _saveStats();
+      if (!_running || operation != _operation) return;
       _replyRecorded = false;
       _idleReplyPending = reason == SpeechReason.idle;
       _guardEndsAt = _clock.now().add(postSpeechGuard);
       state = TrainingState.postSpeechGuard;
       notifyListeners();
     } catch (_) {
-      if (_running && operation == _operation) _resetCycle(_clock.now());
+      if (_running && operation == _operation) {
+        _resetCycle(_clock.now());
+        await microphoneCapture?.resume();
+      }
       notifyListeners();
     }
   }

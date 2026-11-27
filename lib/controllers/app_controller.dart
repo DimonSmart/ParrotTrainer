@@ -57,6 +57,24 @@ class AppController extends ChangeNotifier {
   DateTime? _calibrationStartedAt;
   bool _microphoneCaptureSuspended = false;
   bool _lifecyclePaused = false;
+  bool _audioCaptureActive = false;
+  bool _speechCaptureSuspended = false;
+  bool _previewing = false;
+  bool _calibrationInterrupted = false;
+  bool _screenKeptOn = false;
+  bool _backgroundEnabled = false;
+  bool _disposed = false;
+  Future<void> _scheduleOperation = Future.value();
+
+  bool get _canRunInBackground =>
+      settings.allowScreenToSleep || settings.dailyScheduleEnabled;
+
+  bool get _captureAllowed =>
+      !_microphoneCaptureSuspended &&
+      !_speechCaptureSuspended &&
+      !_previewing &&
+      (!_lifecyclePaused || (trainingEnabled && _canRunInBackground)) &&
+      settings.isTrainingAllowedAt(_now());
   Timer? _scheduleTimer;
   Timer? _scheduleTransitionTimer;
   Timer? _activityCheckpointTimer;
@@ -101,6 +119,7 @@ class AppController extends ChangeNotifier {
     );
     session.addListener(_sessionChanged);
     _levelSubscription = _audio.levels.listen((level) {
+      if (!_audioCaptureActive || !_captureAllowed) return;
       currentLevelDb = level;
       final started = _calibrationStartedAt;
       if (calibrating &&
@@ -111,10 +130,14 @@ class AppController extends ChangeNotifier {
       session.handleAudioLevel(level);
       notifyListeners();
     });
-    try {
-      microphoneAvailable = await _audio.start();
-    } catch (_) {
-      microphoneAvailable = false;
+    if (_captureAllowed) {
+      await _startAudioCapture();
+    } else {
+      try {
+        microphoneAvailable = await _audio.checkPermission();
+      } catch (_) {
+        microphoneAvailable = false;
+      }
     }
     try {
       voices = await tts.getVoices();
@@ -138,41 +161,40 @@ class AppController extends ChangeNotifier {
 
   Future<void> updateSettings(TrainingSettings value) async {
     settings = value;
-    session.updateSettings(value);
+    if (settings.isTrainingAllowedAt(_now())) {
+      session.updateSettings(value);
+    }
     await _settingsRepository.save(value);
     await _synchronizeTrainingWithSchedule();
+    if (!settings.isTrainingAllowedAt(_now())) {
+      session.updateSettings(settings);
+    }
   }
 
   Future<bool> startTraining() async {
     trainingEnabled = true;
     final allowed = settings.isTrainingAllowedAt(_now());
+    if (!allowed && !microphoneAvailable) {
+      try {
+        microphoneAvailable = await _audio.checkPermission();
+      } catch (_) {
+        microphoneAvailable = false;
+      }
+    }
     await _synchronizeTrainingWithSchedule();
     notifyListeners();
-    return !allowed || session.isRunning;
+    return (!allowed && microphoneAvailable) || session.isRunning;
   }
 
   Future<void> stopTraining() async {
     trainingEnabled = false;
-    _scheduleTransitionTimer?.cancel();
-    _scheduleTransitionTimer = null;
-    await _stopActiveSession();
+    await _synchronizeTrainingWithSchedule();
     notifyListeners();
   }
 
   Future<bool> _startActiveSession() async {
     if (session.isRunning) return true;
-    if (_microphoneCaptureSuspended || _lifecyclePaused) return false;
-    if (!microphoneAvailable) {
-      try {
-        microphoneAvailable = await _audio.start();
-      } catch (_) {
-        microphoneAvailable = false;
-      }
-    }
-    if (!microphoneAvailable) {
-      notifyListeners();
-      return false;
-    }
+    if (!_captureAllowed || !_audioCaptureActive) return false;
     final now = _now();
     _activityHistory.start(now);
     session.start();
@@ -183,78 +205,102 @@ class AppController extends ChangeNotifier {
         unawaited(_activityHistory.checkpoint(_now()));
       }
     });
-    await _syncPowerMode();
     return true;
   }
 
   Future<void> _stopActiveSession() async {
     try {
-      if (session.isRunning) {
-        await _activityHistory.stop(_now());
-      }
+      final wasRunning = session.isRunning;
       await session.stop();
+      if (wasRunning) await _activityHistory.stop(_now());
     } finally {
       _activityCheckpointTimer?.cancel();
       _activityCheckpointTimer = null;
-      await _syncPowerMode();
+      _speechCaptureSuspended = false;
     }
   }
 
   Future<void> pauseForBackground() async {
-    if (settings.allowScreenToSleep) return;
     _lifecyclePaused = true;
-    await _stopActiveSession();
-    await _audio.stop();
+    await _synchronizeTrainingWithSchedule();
   }
 
   Future<void> resumeForeground() async {
-    if (_microphoneCaptureSuspended) return;
     _lifecyclePaused = false;
-    await _startAudioCapture();
     await _synchronizeTrainingWithSchedule();
   }
 
   Future<void> suspendMicrophoneCapture() async {
     _microphoneCaptureSuspended = true;
-    await _stopActiveSession();
-    await _audio.stop();
+    await _synchronizeTrainingWithSchedule();
   }
 
   Future<void> resumeMicrophoneCapture() async {
     _microphoneCaptureSuspended = false;
-    await _startAudioCapture();
     await _synchronizeTrainingWithSchedule();
   }
 
   Future<void> _startAudioCapture() async {
+    if (_audioCaptureActive || !_captureAllowed) return;
     try {
       microphoneAvailable = await _audio.start();
+      _audioCaptureActive = microphoneAvailable;
     } catch (_) {
       microphoneAvailable = false;
+      _audioCaptureActive = false;
     }
-    notifyListeners();
+    if (!_captureAllowed) await _stopAudioCapture();
   }
 
-  Future<void> _suspendAudioCaptureForSpeech() => _audio.stop();
+  Future<void> _stopAudioCapture() async {
+    _audioCaptureActive = false;
+    currentLevelDb = -80;
+    await _audio.stop();
+  }
+
+  Future<void> _suspendAudioCaptureForSpeech() async {
+    _speechCaptureSuspended = true;
+    await _stopAudioCapture();
+  }
 
   Future<void> _resumeAudioCaptureAfterSpeech() async {
-    if (_microphoneCaptureSuspended || !session.isRunning) return;
-    await _startAudioCapture();
+    if (!session.isRunning) return;
+    _speechCaptureSuspended = false;
+    await _synchronizeTrainingWithSchedule();
   }
 
-  Future<void> _synchronizeTrainingWithSchedule() async {
+  Future<void> _synchronizeTrainingWithSchedule() {
+    final result = _scheduleOperation.then((_) async {
+      if (_disposed) return;
+      await _applySchedule();
+    });
+    _scheduleOperation = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
+  Future<void> _applySchedule() async {
     final shouldRun =
         trainingEnabled &&
         !_microphoneCaptureSuspended &&
-        !_lifecyclePaused &&
+        !_previewing &&
+        !calibrating &&
+        (!_lifecyclePaused || _canRunInBackground) &&
         settings.isTrainingAllowedAt(_now());
-    if (shouldRun) {
-      await _startActiveSession();
-    } else if (session.isRunning) {
+
+    if (!shouldRun && session.isRunning) {
       await _stopActiveSession();
-    } else {
-      await _syncPowerMode();
     }
+    if (!_captureAllowed) {
+      if (calibrating) _calibrationInterrupted = true;
+      await _stopAudioCapture();
+    } else {
+      await _startAudioCapture();
+    }
+    if (shouldRun && !session.isRunning && _captureAllowed && trainingEnabled) {
+      await _startActiveSession();
+    }
+    await _syncPowerMode();
+    if (_disposed) return;
     _scheduleNextTransition();
     notifyListeners();
   }
@@ -276,10 +322,23 @@ class AppController extends ChangeNotifier {
 
   Future<void> _syncPowerMode() async {
     final running = session.isRunning;
-    await _keepScreenOn.setEnabled(running && !settings.allowScreenToSleep);
-    await _keepScreenOn.setBackgroundTrainingEnabled(
-      running && settings.allowScreenToSleep,
-    );
+    final keepScreenOn = running && !settings.allowScreenToSleep;
+    final backgroundEnabled =
+        trainingEnabled &&
+        microphoneAvailable &&
+        !_microphoneCaptureSuspended &&
+        (!_lifecyclePaused || _canRunInBackground) &&
+        (settings.dailyScheduleEnabled ||
+            (running && settings.allowScreenToSleep));
+
+    if (_backgroundEnabled != backgroundEnabled) {
+      await _keepScreenOn.setBackgroundTrainingEnabled(backgroundEnabled);
+      _backgroundEnabled = backgroundEnabled;
+    }
+    if (_screenKeptOn != keepScreenOn) {
+      await _keepScreenOn.setEnabled(keepScreenOn);
+      _screenKeptOn = keepScreenOn;
+    }
   }
 
   Future<void> resetSettings() async {
@@ -301,9 +360,15 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> calibrateMicrophone() async {
-    if (calibrating) return;
-    await _stopActiveSession();
+    if (calibrating || !_captureAllowed) return;
     calibrating = true;
+    _calibrationInterrupted = false;
+    await _synchronizeTrainingWithSchedule();
+    if (!_audioCaptureActive) {
+      calibrating = false;
+      await _synchronizeTrainingWithSchedule();
+      return;
+    }
     _calibrationSamples.clear();
     _calibrationStartedAt = _now();
     for (var remaining = 10; remaining > 0; remaining--) {
@@ -318,7 +383,11 @@ class AppController extends ChangeNotifier {
     );
     calibrating = false;
     calibrationSecondsLeft = 0;
-    await updateSettings(settings.copyWith(soundThresholdDb: threshold));
+    if (!_calibrationInterrupted && settings.isTrainingAllowedAt(_now())) {
+      await updateSettings(settings.copyWith(soundThresholdDb: threshold));
+    } else {
+      await _synchronizeTrainingWithSchedule();
+    }
   }
 
   void markGoodAttempt() => session.markGoodAttempt();
@@ -329,16 +398,20 @@ class AppController extends ChangeNotifier {
   Future<List<DailyActivity>> loadActivityMonth(int year, int month) =>
       _activityHistoryRepository.loadMonth(year, month);
 
-  Future<void> previewVoice(TtsVoice voice) async {
-    await _stopActiveSession();
-    await tts.speak(_previewPhrase, settings, voice);
-    await _synchronizeTrainingWithSchedule();
-  }
+  Future<void> previewVoice(TtsVoice voice) => _preview(voice);
 
-  Future<void> previewSpeechSettings() async {
-    await _stopActiveSession();
-    await tts.speak(_previewPhrase, settings, null);
-    await _synchronizeTrainingWithSchedule();
+  Future<void> previewSpeechSettings() => _preview(null);
+
+  Future<void> _preview(TtsVoice? voice) async {
+    if (_previewing) return;
+    _previewing = true;
+    try {
+      await _synchronizeTrainingWithSchedule();
+      await tts.speak(_previewPhrase, settings, voice);
+    } finally {
+      _previewing = false;
+      await _synchronizeTrainingWithSchedule();
+    }
   }
 
   String get _previewPhrase => switch (
@@ -351,6 +424,7 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     session.removeListener(_sessionChanged);
     session.dispose();
     _scheduleTimer?.cancel();

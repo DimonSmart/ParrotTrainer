@@ -6,6 +6,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Build
+import android.os.PowerManager
 import android.view.WindowManager
 import java.io.File
 import io.flutter.embedding.android.FlutterActivity
@@ -31,6 +32,7 @@ class MainActivity : FlutterActivity() {
                 }
                 if (call.argument<Boolean>("enabled") == true) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    wakeScreenIfNeeded()
                 } else {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
@@ -70,6 +72,20 @@ class MainActivity : FlutterActivity() {
                         }
                 }.start()
             }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun wakeScreenIfNeeded() {
+        val power = getSystemService(POWER_SERVICE) as PowerManager
+        if (!power.isInteractive) {
+            // Wake the display, without dismissing the user's lock screen.
+            runCatching {
+                power.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                    "$packageName:scheduled-screen",
+                ).acquire(10_000L)
+            }
+        }
     }
 
     private fun convertWavToM4a(sourcePath: String, destinationPath: String) {
