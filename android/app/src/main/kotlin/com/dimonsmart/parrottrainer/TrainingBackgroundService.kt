@@ -62,9 +62,9 @@ class TrainingBackgroundService : Service() {
             )
             .setContentText(
                 when (language) {
-                    "ru" -> "Обучение продолжается при выключенном экране"
-                    "es" -> "El entrenamiento continúa con la pantalla apagada"
-                    else -> "Training continues while the screen is off"
+                    "ru" -> "Обучение включено и следует расписанию"
+                    "es" -> "El entrenamiento está habilitado y sigue el horario"
+                    else -> "Training is enabled and follows the schedule"
                 },
             )
             .setOngoing(true)

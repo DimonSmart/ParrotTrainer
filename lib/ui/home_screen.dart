@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   );
 
   Future<void> _retryMicrophone() async {
-    await controller.resumeForeground();
+    await controller.retryMicrophone();
     if (!mounted || controller.microphoneAvailable) return;
     ScaffoldMessenger.of(
       context,
@@ -334,9 +334,9 @@ class _MicrophoneCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           OutlinedButton.icon(
-            onPressed: controller.calibrating
-                ? null
-                : controller.calibrateMicrophone,
+            onPressed: controller.canCalibrateMicrophone
+                 ? controller.calibrateMicrophone
+                 : null,
             icon: const Icon(Icons.tune),
             label: Text(
               controller.calibrating

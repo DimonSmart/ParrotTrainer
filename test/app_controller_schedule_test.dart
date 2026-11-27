@@ -26,45 +26,125 @@ void main() {
       dailyScheduleEnabled: true,
       dailySchedule: mask,
     );
+    final audio = _AudioService();
+    final power = _KeepScreenOnService();
     final controller = AppController(
-      settingsRepository: _SettingsRepository(settings),
+      settingsRepository: _SettingsRepository(
+        settings.copyWith(allowScreenToSleep: false),
+      ),
       statisticsRepository: _StatisticsRepository(),
       activityHistoryRepository: _ActivityRepository(),
-      audio: _AudioService(),
+      audio: audio,
       tts: _TtsService(),
-      keepScreenOn: _KeepScreenOnService(),
+      keepScreenOn: power,
       now: () => now,
     );
     addTearDown(controller.dispose);
     await controller.initialize();
 
+    expect(audio.running, isFalse);
+    expect(audio.startCount, 0);
     final accepted = await controller.startTraining();
     expect(accepted, isTrue);
     expect(controller.trainingEnabled, isTrue);
     expect(controller.session.isRunning, isFalse);
 
+    expect(audio.running, isFalse);
+    expect(power.backgroundEnabled, isTrue);
+    expect(power.screenEnabled, isFalse);
+    await controller.pauseForBackground();
     now = DateTime(2026, 1, 1, 8, 10);
     await controller.updateSettings(controller.settings);
     expect(controller.trainingEnabled, isTrue);
     expect(controller.session.isRunning, isTrue);
 
+    expect(audio.running, isTrue);
+    expect(power.screenEnabled, isTrue);
+    audio.emit(-35);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.currentLevelDb, -35);
     now = DateTime(2026, 1, 1, 8, 30);
     await controller.updateSettings(controller.settings);
     expect(controller.trainingEnabled, isTrue);
     expect(controller.session.isRunning, isFalse);
 
+    expect(audio.running, isFalse);
+    expect(controller.currentLevelDb, -80);
+    expect(power.screenEnabled, isFalse);
+    expect(power.backgroundEnabled, isTrue);
+    audio.emit(-15);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.currentLevelDb, -80);
     now = DateTime(2026, 1, 1, 12, 15);
     await controller.updateSettings(controller.settings);
     expect(controller.session.isRunning, isTrue);
 
+    expect(audio.running, isTrue);
+    expect(power.screenEnabled, isTrue);
     await controller.stopTraining();
     expect(controller.trainingEnabled, isFalse);
     expect(controller.session.isRunning, isFalse);
 
+    expect(audio.running, isFalse);
+    expect(power.backgroundEnabled, isFalse);
+    expect(power.screenEnabled, isFalse);
     now = DateTime(2026, 1, 1, 12, 30);
     await controller.updateSettings(controller.settings);
     expect(controller.session.isRunning, isFalse);
   });
+
+  for (final allowSleep in [false, true]) {
+    testWidgets('timer starts and stops capture; allow sleep: $allowSleep', (
+      tester,
+    ) async {
+      var now = DateTime(2026, 1, 1, 8, 14, 59);
+      final audio = _AudioService();
+      final power = _KeepScreenOnService();
+      final controller = AppController(
+        settingsRepository: _SettingsRepository(
+          TrainingSettings.defaults.copyWith(
+            dailyScheduleEnabled: true,
+            dailySchedule: DailyScheduleMask.allOff.withSlot(33, true),
+            allowScreenToSleep: allowSleep,
+          ),
+        ),
+        statisticsRepository: _StatisticsRepository(),
+        activityHistoryRepository: _ActivityRepository(),
+        audio: audio,
+        tts: _TtsService(),
+        keepScreenOn: power,
+        now: () => now,
+      );
+      try {
+        await controller.initialize();
+        await controller.startTraining();
+        await controller.pauseForBackground();
+        expect(audio.running, isFalse);
+        expect(power.backgroundEnabled, isTrue);
+        now = DateTime(2026, 1, 1, 8, 15);
+        await tester.pump(const Duration(seconds: 1));
+        expect(controller.session.isRunning, isTrue);
+        expect(audio.running, isTrue);
+        expect(power.screenEnabled, !allowSleep);
+
+        // The periodic fallback notices a wall-clock jump and re-arms
+        // the exact transition timer for the next second.
+        now = DateTime(2026, 1, 1, 8, 29, 59);
+        await tester.pump(const Duration(seconds: 29));
+        now = DateTime(2026, 1, 1, 8, 30);
+        await tester.pump(const Duration(seconds: 1));
+        expect(controller.session.isRunning, isFalse);
+        expect(audio.running, isFalse);
+        expect(controller.currentLevelDb, -80);
+        expect(power.screenEnabled, isFalse);
+        expect(power.backgroundEnabled, isTrue);
+        await controller.stopTraining();
+        expect(power.backgroundEnabled, isFalse);
+      } finally {
+        controller.dispose();
+      }
+    });
+  }
 
   test('changing the current slot synchronizes once without disabling trainer', () async {
     final now = DateTime(2026, 1, 1, 10, 5);
@@ -171,10 +251,21 @@ class _AudioService extends AudioLevelService {
   Stream<double> get levels => _controller.stream;
 
   @override
-  Future<bool> start() async => true;
+  Future<bool> checkPermission() async => true;
+  bool running = false;
+  int startCount = 0;
+  void emit(double value) => _controller.add(value);
+  @override
+  Future<bool> start() async {
+    startCount++;
+    running = true;
+    return true;
+  }
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    running = false;
+  }
 
   @override
   Future<void> dispose() async => _controller.close();
@@ -196,9 +287,15 @@ class _TtsService implements TtsService {
 }
 
 class _KeepScreenOnService implements KeepScreenOnService {
+  bool screenEnabled = false;
+  bool backgroundEnabled = false;
   @override
-  Future<void> setEnabled(bool enabled) async {}
+  Future<void> setEnabled(bool enabled) async {
+    screenEnabled = enabled;
+  }
 
   @override
-  Future<void> setBackgroundTrainingEnabled(bool enabled) async {}
+  Future<void> setBackgroundTrainingEnabled(bool enabled) async {
+    backgroundEnabled = enabled;
+  }
 }
